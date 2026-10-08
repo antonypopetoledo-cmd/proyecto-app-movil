@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import LoginScreen from './screens/LoginScreen';
 import CatalogScreen from './screens/CatalogScreen';
 import InterestsScreen from './screens/InterestsScreen';
+import DetalleEventoScreen from './screens/DetalleEventoScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -12,8 +13,9 @@ export default function App() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="Intereses" component={InterestsScreen} />
+        <Stack.Screen name="Intereses" component={InterestsScreen} />
         <Stack.Screen name="Catalogo" component={CatalogScreen} />
+        <Stack.Screen name="DetalleEvento" component={DetalleEventoScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

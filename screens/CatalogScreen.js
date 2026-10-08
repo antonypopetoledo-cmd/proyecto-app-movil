@@ -13,9 +13,9 @@ import {
 import { Image } from "expo-image";
 import useEventos from "../hooks/useEventos";
 
-function EventCard({ evento, esFavorito, onToggleFavorito }) {
+function EventCard({ evento, esFavorito, onToggleFavorito, onPress }) {
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.85}>
+    <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={onPress}>
       <View>
         <Image
           source={{ uri: evento.imagen }}
@@ -115,6 +115,7 @@ export default function CatalogScreen({ navigation }) {
             evento={item}
             esFavorito={favoritos.includes(item.id)}
             onToggleFavorito={toggleFavorito}
+            onPress={() => navigation.navigate("DetalleEvento", { evento: item })}
           />
         )}
         contentContainerStyle={styles.list}
