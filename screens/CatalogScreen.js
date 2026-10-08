@@ -1,72 +1,36 @@
-import React from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
   FlatList,
   StyleSheet,
   TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
 } from "react-native";
-import { Image } from 'expo-image';
+import { Image } from "expo-image";
+import useEventos from "../hooks/useEventos";
 
-const EVENTOS_MOCK = [
-  {
-    id: "1",
-    titulo: "Testing Day Perú 2026 – 2.ª Edición",
-    categoria: "💻 Tecnología",
-    fecha: "18–19 sep",
-    hora: null,
-    lugar: "Escuela de Postgrado UTP, San Isidro",
-    precio: "Por confirmar",
-    imagen:
-      "https://images.lumacdn.com/uploads/ud/78bc442f-1751-44ad-8030-f70a9f7a6a29.png",
-    posicion: 'center',
-  },
-  {
-    id: "2",
-    titulo: "aespa – LIVE TOUR 2026–27",
-    categoria: "💗 K-pop",
-    fecha: "9 sep",
-    hora: null,
-    lugar: "Costa 21, San Isidro",
-    precio: "Según zona",
-    imagen:
-      "https://static.wikia.nocookie.net/kpop-and-idols/images/8/80/%F0%93%86%A9%E0%BC%A2%E0%BF%94%E0%BE%80%E0%AB%81%E2%9D%80%E2%9C%AF%E2%81%96%E2%84%98.jpeg/revision/latest?cb=20241026025900",
-    posicion: 'top',
-  },
-  {
-    id: "3",
-    titulo: "Metro Gamer Fest 2026",
-    categoria: "🎮 Gaming",
-    fecha: "19–20 sep",
-    hora: "2:00 p. m. – 9:00 p. m.",
-    lugar: "Metro San Juan de Lurigancho – Hacienda",
-    precio: "Gratis",
-    imagen: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS6lr1-hAvJcLnXM7Z7300tWWNlFQUti3UVSsmxor4iBQ0-x6_6gDIwKEwA&s=10",
-    posicion: 'top',
-  },
-  {
-    id: "4",
-    titulo: "Anime Fest Lima 2026",
-    categoria: "🍥 Anime",
-    fecha: "8 sep",
-    hora: "10:00 a. m.",
-    lugar: "Lima Expo, Cercado de Lima",
-    precio: "S/15",
-    imagen:
-      "https://blogbagatela.wordpress.com/wp-content/uploads/2019/10/71860223_2875087599185318_5924745773802586112_n.jpg",
-  },
-];
-
-function EventCard({ evento }) {
+function EventCard({ evento, esFavorito, onToggleFavorito }) {
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.85}>
-      <Image
-        source={{ uri: evento.imagen }}
-        style={styles.image}
-        contentFit="cover"
-        contentPosition={evento.posicion || 'center'}
-        transition={200}
-      />
+      <View>
+        <Image
+          source={{ uri: evento.imagen }}
+          style={styles.image}
+          contentFit="cover"
+          contentPosition={evento.posicion || "center"}
+          transition={200}
+        />
+        <TouchableOpacity
+          style={styles.favButton}
+          onPress={() => onToggleFavorito(evento.id)}
+        >
+          <Text style={styles.favIcon}>{esFavorito ? "❤️" : "🤍"}</Text>
+        </TouchableOpacity>
+      </View>
       <View style={styles.info}>
         <View style={styles.rowTop}>
           <Text style={styles.categoria}>{evento.categoria}</Text>
@@ -75,7 +39,7 @@ function EventCard({ evento }) {
         <Text style={styles.titulo}>{evento.titulo}</Text>
         <Text style={styles.detalle}>
           {evento.fecha}
-          {evento.hora ? ` · ${evento.hora}` : ''}
+          {evento.hora ? ` · ${evento.hora}` : ""}
         </Text>
         <Text style={styles.detalle}>{evento.lugar}</Text>
       </View>
@@ -84,11 +48,84 @@ function EventCard({ evento }) {
 }
 
 export default function CatalogScreen({ navigation }) {
+  const { eventos, loading, refreshing, error, recargar, reintentar } =
+    useEventos();
+
+  const [busqueda, setBusqueda] = useState("");
+  const [categoria, setCategoria] = useState("Todos");
+  const [favoritos, setFavoritos] = useState([]);
+  const [soloFavoritos, setSoloFavoritos] = useState(false);
+
   const cerrarSesion = () => {
     navigation.reset({
       index: 0,
       routes: [{ name: "Login" }],
     });
+  };
+
+  const toggleFavorito = (id) => {
+    setFavoritos((prev) =>
+      prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]
+    );
+  };
+
+  const categorias = useMemo(
+    () => ["Todos", ...new Set(eventos.map((e) => e.categoria))],
+    [eventos]
+  );
+
+  const eventosFiltrados = useMemo(() => {
+    return eventos.filter((e) => {
+      const coincideTexto =
+        e.titulo.toLowerCase().includes(busqueda.toLowerCase()) ||
+        e.lugar.toLowerCase().includes(busqueda.toLowerCase());
+      const coincideCategoria = categoria === "Todos" || e.categoria === categoria;
+      const coincideFav = !soloFavoritos || favoritos.includes(e.id);
+      return coincideTexto && coincideCategoria && coincideFav;
+    });
+  }, [eventos, busqueda, categoria, soloFavoritos, favoritos]);
+
+  const renderContenido = () => {
+    if (loading) {
+      return (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#5B4BDB" />
+          <Text style={styles.mensaje}>Cargando eventos...</Text>
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={styles.center}>
+          <Text style={styles.mensaje}>😕 {error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={reintentar}>
+            <Text style={styles.retryText}>Reintentar</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <FlatList
+        data={eventosFiltrados}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <EventCard
+            evento={item}
+            esFavorito={favoritos.includes(item.id)}
+            onToggleFavorito={toggleFavorito}
+          />
+        )}
+        contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={recargar} />
+        }
+        ListEmptyComponent={
+          <Text style={styles.mensajeVacio}>No se encontraron eventos</Text>
+        }
+      />
+    );
   };
 
   return (
@@ -107,12 +144,39 @@ export default function CatalogScreen({ navigation }) {
         </View>
       </View>
 
-      <FlatList
-        data={EVENTOS_MOCK}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <EventCard evento={item} />}
-        contentContainerStyle={styles.list}
-      />
+      <View style={styles.filtros}>
+        <TextInput
+          style={styles.input}
+          placeholder="Buscar por nombre o lugar..."
+          value={busqueda}
+          onChangeText={setBusqueda}
+        />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <TouchableOpacity
+            style={[styles.chip, soloFavoritos && styles.chipActivo]}
+            onPress={() => setSoloFavoritos(!soloFavoritos)}
+          >
+            <Text style={[styles.chipText, soloFavoritos && styles.chipTextActivo]}>
+              ❤️ Favoritos
+            </Text>
+          </TouchableOpacity>
+          {categorias.map((cat) => (
+            <TouchableOpacity
+              key={cat}
+              style={[styles.chip, categoria === cat && styles.chipActivo]}
+              onPress={() => setCategoria(cat)}
+            >
+              <Text
+                style={[styles.chipText, categoria === cat && styles.chipTextActivo]}
+              >
+                {cat}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {renderContenido()}
     </View>
   );
 }
@@ -156,20 +220,59 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#FFF",
   },
-  logoutText: {
-    color: "#FFF",
-    fontSize: 12,
-    fontWeight: "600",
-  },
+  logoutText: { color: "#FFF", fontSize: 12, fontWeight: "600" },
   rowTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 4,
   },
-  precio: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#2E7D32",
+  precio: { fontSize: 12, fontWeight: "700", color: "#2E7D32" },
+
+  // Nuevos
+  filtros: { paddingHorizontal: 15, paddingTop: 12 },
+  input: {
+    backgroundColor: "#FFF",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#DDD",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
   },
+  chip: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#5B4BDB",
+    marginRight: 8,
+  },
+  chipActivo: { backgroundColor: "#5B4BDB" },
+  chipText: { color: "#5B4BDB", fontWeight: "600", fontSize: 13 },
+  chipTextActivo: { color: "#FFF" },
+  favButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderRadius: 20,
+    width: 36,
+    height: 36,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  favIcon: { fontSize: 18 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
+  mensaje: { marginTop: 10, fontSize: 15, color: "#555", textAlign: "center" },
+  mensajeVacio: { textAlign: "center", color: "#777", marginTop: 30 },
+  retryButton: {
+    marginTop: 14,
+    backgroundColor: "#5B4BDB",
+    paddingVertical: 10,
+    paddingHorizontal: 22,
+    borderRadius: 20,
+  },
+  retryText: { color: "#FFF", fontWeight: "600" },
 });
