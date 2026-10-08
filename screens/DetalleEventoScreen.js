@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  Linking,
 } from "react-native";
 import { Image } from "expo-image";
 
@@ -19,6 +20,11 @@ export default function DetalleEventoScreen({ route, navigation }) {
       recordatorio ? "Recordatorio quitado" : "Recordatorio activado",
       evento.titulo
     );
+  };
+
+  const abrirMapa = () => {
+    const query = encodeURIComponent(evento.lugar);
+    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
   };
 
   return (
@@ -47,6 +53,10 @@ export default function DetalleEventoScreen({ route, navigation }) {
 
           <Text style={styles.label}>📍 Lugar</Text>
           <Text style={styles.valor}>{evento.lugar}</Text>
+
+          <TouchableOpacity style={styles.botonSecundario} onPress={abrirMapa}>
+            <Text style={styles.botonSecundarioText}>🗺️ Ver en Google Maps</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.boton, recordatorio && styles.botonActivo]}
@@ -88,7 +98,7 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 12,
     alignItems: "center",
-    marginTop: 28,
+    marginTop: 10,
   },
   botonActivo: { backgroundColor: "#2E7D32" },
   botonText: { color: "#FFF", fontWeight: "700", fontSize: 15 },

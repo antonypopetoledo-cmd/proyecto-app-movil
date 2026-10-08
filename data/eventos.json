@@ -8,7 +8,10 @@
     "lugar": "Escuela de Postgrado UTP, San Isidro",
     "precio": "Por confirmar",
     "imagen": "https://images.lumacdn.com/uploads/ud/78bc442f-1751-44ad-8030-f70a9f7a6a29.png",
-    "posicion": "center"
+    "posicion": "center",
+    "descripcion": "Segunda edición del evento de testing de software más grande del país, con charlas, talleres y networking.",
+    "organizador": "Testing Day Perú",
+    "enlace": "https://luma.com/ibbkykgd?locale=es"
   },
   {
     "id": "2",
@@ -19,7 +22,10 @@
     "lugar": "Costa 21, San Isidro",
     "precio": "Según zona",
     "imagen": "https://static.wikia.nocookie.net/kpop-and-idols/images/8/80/%F0%93%86%A9%E0%BC%A2%E0%BF%94%E0%BE%80%E0%AB%81%E2%9D%80%E2%9C%AF%E2%81%96%E2%84%98.jpeg/revision/latest?cb=20241026025900",
-    "posicion": "top"
+    "posicion": "top",
+    "descripcion": "Gira mundial de aespa con una fecha en Lima. Los precios varían según la zona del recinto.",
+    "organizador": "Por confirmar",
+    "enlace": "https://aespaworldtour.com/"
   },
   {
     "id": "3",
@@ -30,17 +36,23 @@
     "lugar": "Metro San Juan de Lurigancho – Hacienda",
     "precio": "Gratis",
     "imagen": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS6lr1-hAvJcLnXM7Z7300tWWNlFQUti3UVSsmxor4iBQ0-x6_6gDIwKEwA&s=10",
-    "posicion": "top"
+    "posicion": "top",
+    "descripcion": "Festival gamer con torneos, zona retro, cosplay y stands de tiendas. Entrada libre.",
+    "organizador": "Metro de Lima",
+    "enlace": "https://www.mercadonegro.pe/marketing/metro-gamer-fest-sjl-septiembre/"
   },
   {
     "id": "4",
-    "titulo": "Anime Fest Lima 2026",
+    "titulo": "Anime Perú Fest 2026",
     "categoria": "🍥 Anime",
-    "fecha": "8 sep",
-    "hora": "10:00 a. m.",
-    "lugar": "Lima Expo, Cercado de Lima",
-    "precio": "S/15",
-    "imagen": "https://blogbagatela.wordpress.com/wp-content/uploads/2019/10/71860223_2875087599185318_5924745773802586112_n.jpg",
-    "posicion": "center"
+    "fecha": "16–18 oct",
+    "hora": "11:00 a. m",
+    "lugar": "Castillo Rospigliosi, Santa Beatriz, Lima",
+    "precio": "Desde S/ 5",
+    "imagen": "https://cdn.joinnus.com/images/78955/main/2Y6HyWkTAdJduNp.webp",
+    "posicion": "center",
+    "descripcion": "Tres días para fans del anime con bandas en vivo, concursos y desfiles de cosplay, zona de fotos temática, gastronomía asiática y actividades especiales.",
+    "organizador": null,
+    "enlace": "https://www.joinnus.com/events/festivales/lima-anime-peru-fest-2026-78955"
   }
 ]
