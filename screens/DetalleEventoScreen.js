@@ -27,6 +27,10 @@ export default function DetalleEventoScreen({ route, navigation }) {
     Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
   };
 
+  const abrirEnlace = () => {
+    Linking.openURL(evento.enlace);
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView>
@@ -53,6 +57,26 @@ export default function DetalleEventoScreen({ route, navigation }) {
 
           <Text style={styles.label}>📍 Lugar</Text>
           <Text style={styles.valor}>{evento.lugar}</Text>
+
+          {evento.organizador ? (
+            <>
+              <Text style={styles.label}>🎤 Organizador</Text>
+              <Text style={styles.valor}>{evento.organizador}</Text>
+            </>
+          ) : null}
+
+          {evento.descripcion ? (
+            <>
+              <Text style={styles.label}>📝 Descripción</Text>
+              <Text style={styles.valor}>{evento.descripcion}</Text>
+            </>
+          ) : null}
+
+          {evento.enlace ? (
+            <TouchableOpacity style={styles.boton} onPress={abrirEnlace}>
+              <Text style={styles.botonText}>🎟️ Ir al sitio oficial</Text>
+            </TouchableOpacity>
+          ) : null}
 
           <TouchableOpacity style={styles.botonSecundario} onPress={abrirMapa}>
             <Text style={styles.botonSecundarioText}>🗺️ Ver en Google Maps</Text>

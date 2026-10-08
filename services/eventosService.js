@@ -9,7 +9,7 @@ export const getEventos = async () => {
   try {
     if (SIMULAR_ERROR) throw new Error("No se pudo conectar con el servidor");
 
-    const res = await fetch(API_URL);
+    const res = await fetch(`${API_URL}?t=${Date.now()}`);
     if (!res.ok) throw new Error("Error " + res.status);
     return await res.json();
   } catch (e) {
