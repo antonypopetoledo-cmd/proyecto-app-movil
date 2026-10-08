@@ -1,7 +1,7 @@
 import eventosLocal from "../data/eventos.json";
 
 const API_URL =
-  "https://raw.githubusercontent.com/antonypopetoledo-cmd/proyecto-app-movil/jay/data/eventos.json";
+  "https://raw.githubusercontent.com/antonypopetoledo-cmd/proyecto-app-movil/main/data/eventos.json";
 // Pon true para mostrar la pantalla de error en la exposición
 const SIMULAR_ERROR = false;
 
