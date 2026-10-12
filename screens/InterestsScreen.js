@@ -32,7 +32,10 @@ export default function InterestsScreen({ navigation }) {
   };
 
   const continuar = () => {
-    navigation.replace('Catalogo', { intereses: seleccionados });
+    navigation.replace('Principal', {
+      screen: 'Eventos',
+      params: { intereses: seleccionados },
+    });
   };
 
   return (

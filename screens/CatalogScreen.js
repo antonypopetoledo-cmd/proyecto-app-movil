@@ -57,7 +57,7 @@ export default function CatalogScreen({ navigation }) {
   const [soloFavoritos, setSoloFavoritos] = useState(false);
 
   const cerrarSesion = () => {
-    navigation.reset({
+    navigation.getParent().reset({
       index: 0,
       routes: [{ name: "Login" }],
     });
