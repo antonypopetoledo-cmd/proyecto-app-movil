@@ -7,6 +7,11 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
+import {
+  USUARIO_PRUEBA,
+  registrarUsuario,
+  iniciarSesionConCuenta,
+} from "../services/authService";
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState("");
@@ -21,6 +26,11 @@ export default function LoginScreen({ navigation }) {
     } else if (password.length < 6) {
       setError("La contraseña debe tener al menos 6 caracteres");
     } else {
+      const resultado = registrarUsuario(email, password);
+      if (!resultado.ok) {
+        setError(resultado.mensaje);
+        return;
+      }
       setError("");
       Alert.alert(
         "Bienvenido a LimaGo",
@@ -39,8 +49,20 @@ export default function LoginScreen({ navigation }) {
     } else if (!email.includes("@")) {
       Alert.alert("Correo inválido", "Ingresa un correo con formato válido.");
     } else {
+      const resultado = iniciarSesionConCuenta(email, password);
+      if (!resultado.ok) {
+        Alert.alert(resultado.titulo, resultado.mensaje);
+        return;
+      }
+      setError("");
       navigation.replace("Intereses");
     }
+  };
+
+  const usarCuentaDePrueba = () => {
+    setEmail(USUARIO_PRUEBA.email);
+    setPassword(USUARIO_PRUEBA.password);
+    setError("");
   };
 
   return (
@@ -102,6 +124,11 @@ export default function LoginScreen({ navigation }) {
           activeOpacity={0.8}
         >
           <Text style={styles.loginButtonText}>Iniciar sesión</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={usarCuentaDePrueba} activeOpacity={0.7}>
+          <Text style={styles.testLink}>
+            Usar cuenta de prueba ({USUARIO_PRUEBA.email})
+          </Text>
         </TouchableOpacity>
 
         <Text style={styles.footerText}>Eventos y experiencias en Lima</Text>
@@ -192,5 +219,12 @@ const styles = StyleSheet.create({
     color: "#888",
     fontSize: 12,
     marginTop: 20,
+  },
+  testLink: {
+    textAlign: "center",
+    color: "#5B4BDB",
+    fontSize: 13,
+    fontWeight: "600",
+    marginTop: 16,
   },
 });
