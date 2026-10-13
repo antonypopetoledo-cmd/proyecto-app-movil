@@ -17,13 +17,19 @@ function EventCard({ evento, esFavorito, onToggleFavorito, onPress }) {
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={onPress}>
       <View>
-        <Image
-          source={{ uri: evento.imagen }}
-          style={styles.image}
-          contentFit="cover"
-          contentPosition={evento.posicion || "center"}
-          transition={200}
-        />
+                {evento.imagen ? (
+          <Image
+            source={{ uri: evento.imagen }}
+            style={styles.image}
+            contentFit="cover"
+            contentPosition={evento.posicion || "center"}
+            transition={200}
+          />
+        ) : (
+          <View style={[styles.image, styles.sinImagen]}>
+            <Text style={styles.sinImagenIcono}>🎉</Text>
+          </View>
+        )}
         <TouchableOpacity
           style={styles.favButton}
           onPress={() => onToggleFavorito(evento.id)}
@@ -200,6 +206,12 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   image: { width: "100%", height: 150 },
+    sinImagen: {
+    backgroundColor: "#E0DDFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sinImagenIcono: { fontSize: 48 },
   info: { padding: 14 },
   categoria: {
     fontSize: 12,
