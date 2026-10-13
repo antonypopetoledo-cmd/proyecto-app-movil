@@ -1,8 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { getEventos } from "../services/eventosService";
+import useSolicitudes from "./useSolicitudes";
 
 export default function useEventos() {
-  const [eventos, setEventos] = useState([]);
+  const [eventosBase, setEventos] = useState([]);
+  // Los eventos aceptados desde las solicitudes se muestran junto a los demás.
+  const { aprobados } = useSolicitudes();
+  const eventos = useMemo(
+    () => [...aprobados, ...eventosBase],
+    [aprobados, eventosBase]
+  );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);

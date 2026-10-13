@@ -34,12 +34,18 @@ export default function DetalleEventoScreen({ route, navigation }) {
   return (
     <View style={styles.container}>
       <ScrollView>
-        <Image
-          source={{ uri: evento.imagen }}
-          style={styles.image}
-          contentFit="cover"
-          contentPosition={evento.posicion || "center"}
-        />
+        {evento.imagen ? (
+          <Image
+            source={{ uri: evento.imagen }}
+            style={styles.image}
+            contentFit="cover"
+            contentPosition={evento.posicion || "center"}
+          />
+        ) : (
+          <View style={[styles.image, styles.sinImagen]}>
+            <Text style={styles.sinImagenIcono}>🎉</Text>
+          </View>
+        )}
 
         <View style={styles.content}>
           <View style={styles.rowTop}>
@@ -106,6 +112,12 @@ export default function DetalleEventoScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F4F6FF" },
   image: { width: "100%", height: 240 },
+  sinImagen: {
+    backgroundColor: "#E0DDFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sinImagenIcono: { fontSize: 64 },
   content: { padding: 20 },
   rowTop: {
     flexDirection: "row",
