@@ -3,29 +3,35 @@ import {
   suscribir,
   getPendientes,
   getAprobados,
+  getRechazados,
   enviarSolicitud,
   aceptarSolicitud,
+  rechazarSolicitud,
+  reenviarSolicitud,
   eliminarSolicitud,
 } from "../services/solicitudesService";
 
-export default function useSolicitudes() {
-  const [pendientes, setPendientes] = useState(getPendientes());
-  const [aprobados, setAprobados] = useState(getAprobados());
+export default function useSolicitudes(sesion) {
+  const [pendientes, setPendientes] = useState([]);
+  const [aprobados, setAprobados] = useState([]);
+  const [rechazados, setRechazados] = useState([]);
 
   useEffect(() => {
-    const sincronizar = () => {
-      setPendientes(getPendientes());
-      setAprobados(getAprobados());
+    const sincronizar = async () => {
+      setPendientes(await getPendientes()); setAprobados(await getAprobados()); setRechazados(await getRechazados());
     };
     sincronizar();
     return suscribir(sincronizar);
-  }, []);
+  }, [sesion]);
 
   return {
     pendientes,
     aprobados,
-    enviarSolicitud,
-    aceptarSolicitud,
-    eliminarSolicitud,
+    rechazados,
+    enviarSolicitud: (datos) => enviarSolicitud(datos, sesion),
+    aceptarSolicitud: (id) => aceptarSolicitud(id, sesion),
+    rechazarSolicitud: (id, motivo) => rechazarSolicitud(id, motivo, sesion),
+    reenviarSolicitud: (id, datos) => reenviarSolicitud(id, datos, sesion),
+    eliminarSolicitud: (id) => eliminarSolicitud(id, sesion),
   };
 }

@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import useSolicitudes from "../hooks/useSolicitudes";
 
 const CAMPOS_VACIOS = {
@@ -25,15 +26,17 @@ const CAMPOS_VACIOS = {
   descripcion: "",
 };
 
-export default function PublicarScreen() {
-  const { enviarSolicitud } = useSolicitudes();
+export default function PublicarScreen({ sesion, navigation }) {
+  const { enviarSolicitud } = useSolicitudes(sesion);
   const [form, setForm] = useState(CAMPOS_VACIOS);
   const [error, setError] = useState("");
+  const [mostrarPublicaciones, setMostrarPublicaciones] = useState(false);
+  const [mostrarCalendario, setMostrarCalendario] = useState(false);
 
   const cambiar = (campo) => (texto) =>
     setForm((prev) => ({ ...prev, [campo]: texto }));
 
-  const enviar = () => {
+  const enviar = async () => {
     if (
       !form.titulo.trim() ||
       !form.categoria.trim() ||
@@ -53,7 +56,7 @@ export default function PublicarScreen() {
     }
 
     setError("");
-    enviarSolicitud(form);
+    await enviarSolicitud(form);
     setForm(CAMPOS_VACIOS);
     Alert.alert(
       "Solicitud enviada",
@@ -99,7 +102,11 @@ export default function PublicarScreen() {
         {campo("Categoría *", "categoria", {
           placeholder: "Ej. 🍥 Anime",
         })}
-        {campo("Fecha *", "fecha", { placeholder: "Ej. 16–18 oct" })}
+        <>
+          <Text style={estilos.label}>Fecha *</Text>
+          <TouchableOpacity style={estilos.input} onPress={() => setMostrarCalendario(true)}><Text>{form.fecha || "Seleccionar fecha"}</Text></TouchableOpacity>
+          {mostrarCalendario ? <DateTimePicker value={new Date()} mode="date" onValueChange={(evento, fecha) => { setMostrarCalendario(false); if (fecha) cambiar("fecha")(fecha.toLocaleDateString("es-PE")); }} /> : null}
+        </>
         {campo("Hora", "hora", { placeholder: "Ej. 8:00 p. m." })}
         {campo("Lugar *", "lugar", {
           placeholder: "Ej. Costa 21, San Miguel",
@@ -169,4 +176,18 @@ const estilos = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
+  botonSecundario: {
+    padding: 14,
+    borderRadius: 10,
+    alignItems: "center",
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: "#5B4BDB",
+  },
+  botonSecundarioTexto: { color: "#5B4BDB", fontWeight: "700" },
+  misSolicitudes: { fontSize: 19, fontWeight: "bold", color: "#222", marginTop: 28, marginBottom: 10 },
+  solicitudPropia: { backgroundColor: "#FFF", borderRadius: 10, padding: 12, marginBottom: 8, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  solicitudTitulo: { flex: 1, color: "#333", fontWeight: "600" },
+  cancelar: { color: "#E53935", fontWeight: "700", marginLeft: 10 },
+  aprobado: { color: "#2E7D32", fontWeight: "700", marginLeft: 10 },
 });

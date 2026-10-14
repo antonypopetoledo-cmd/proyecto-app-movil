@@ -18,7 +18,7 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const validateForm = () => {
+  const validateForm = async () => {
     if (!email || !password) {
       setError("Todos los campos son obligatorios");
     } else if (!email.includes("@")) {
@@ -26,7 +26,7 @@ export default function LoginScreen({ navigation }) {
     } else if (password.length < 6) {
       setError("La contraseña debe tener al menos 6 caracteres");
     } else {
-      const resultado = registrarUsuario(email, password);
+      const resultado = await registrarUsuario(email, password);
       if (!resultado.ok) {
         setError(resultado.mensaje);
         return;
@@ -40,7 +40,7 @@ export default function LoginScreen({ navigation }) {
     }
   };
 
-  const iniciarSesion = () => {
+  const iniciarSesion = async () => {
     if (!email || !password) {
       Alert.alert(
         "Campos incompletos",
@@ -49,7 +49,7 @@ export default function LoginScreen({ navigation }) {
     } else if (!email.includes("@")) {
       Alert.alert("Correo inválido", "Ingresa un correo con formato válido.");
     } else {
-      const resultado = iniciarSesionConCuenta(email, password);
+      const resultado = await iniciarSesionConCuenta(email, password);
       if (!resultado.ok) {
         Alert.alert(resultado.titulo, resultado.mensaje);
         return;

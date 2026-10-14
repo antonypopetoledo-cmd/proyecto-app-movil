@@ -6,12 +6,14 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  Modal,
+  TextInput,
 } from "react-native";
 import useSolicitudes from "../hooks/useSolicitudes";
 
-function SolicitudCard({ solicitud, onAceptar, onEliminar }) {
+function SolicitudCard({ solicitud, onAceptar, onEliminar, onVerDetalle }) {
   return (
-    <View style={estilos.card}>
+    <TouchableOpacity style={estilos.card} onPress={onVerDetalle} activeOpacity={0.9}>
       <Text style={estilos.categoria}>{solicitud.categoria}</Text>
       <Text style={estilos.titulo}>{solicitud.titulo}</Text>
       <Text style={estilos.detalle}>
@@ -26,6 +28,7 @@ function SolicitudCard({ solicitud, onAceptar, onEliminar }) {
       {solicitud.descripcion ? (
         <Text style={estilos.descripcion}>{solicitud.descripcion}</Text>
       ) : null}
+      {solicitud.motivoRechazo ? <Text style={estilos.motivo}>Antecedente: {solicitud.motivoRechazo}</Text> : null}
 
       <View style={estilos.acciones}>
         <TouchableOpacity
@@ -33,7 +36,7 @@ function SolicitudCard({ solicitud, onAceptar, onEliminar }) {
           onPress={onEliminar}
           activeOpacity={0.8}
         >
-          <Text style={estilos.eliminarTexto}>Eliminar</Text>
+          <Text style={estilos.eliminarTexto}>Rechazar</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[estilos.accion, estilos.aceptar]}
@@ -43,12 +46,14 @@ function SolicitudCard({ solicitud, onAceptar, onEliminar }) {
           <Text style={estilos.aceptarTexto}>Aceptar</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
-export default function SolicitudesScreen() {
-  const { pendientes, aceptarSolicitud, eliminarSolicitud } = useSolicitudes();
+export default function SolicitudesScreen({ sesion, navigation }) {
+  const { pendientes, aceptarSolicitud, rechazarSolicitud } = useSolicitudes(sesion);
+  const [solicitudRechazo, setSolicitudRechazo] = React.useState(null);
+  const [motivo, setMotivo] = React.useState("");
 
   const aceptar = (solicitud) => {
     aceptarSolicitud(solicitud.id);
@@ -59,18 +64,7 @@ export default function SolicitudesScreen() {
   };
 
   const eliminar = (solicitud) => {
-    Alert.alert(
-      "Eliminar solicitud",
-      `¿Eliminar "${solicitud.titulo}"? Esta acción no se puede deshacer.`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Eliminar",
-          style: "destructive",
-          onPress: () => eliminarSolicitud(solicitud.id),
-        },
-      ]
-    );
+    setMotivo(""); setSolicitudRechazo(solicitud);
   };
 
   return (
@@ -91,6 +85,7 @@ export default function SolicitudesScreen() {
             solicitud={item}
             onAceptar={() => aceptar(item)}
             onEliminar={() => eliminar(item)}
+            onVerDetalle={() => navigation.navigate("DetalleEvento", { evento: item, esSolicitud: true })}
           />
         )}
         contentContainerStyle={estilos.lista}
@@ -98,6 +93,17 @@ export default function SolicitudesScreen() {
           <Text style={estilos.vacio}>No hay solicitudes pendientes</Text>
         }
       />
+      <Modal visible={!!solicitudRechazo} transparent animationType="fade">
+        <View style={estilos.modalFondo}><View style={estilos.modal}>
+          <Text style={estilos.modalTitulo}>Motivo del rechazo</Text>
+          <Text style={estilos.modalAyuda}>Indica al usuario qué debe corregir.</Text>
+          <TextInput style={estilos.modalInput} value={motivo} onChangeText={setMotivo} multiline placeholder="Escribe el motivo" />
+          <View style={estilos.modalAcciones}>
+            <TouchableOpacity style={estilos.modalCancelar} onPress={() => setSolicitudRechazo(null)}><Text style={estilos.modalCancelarTexto}>Cancelar</Text></TouchableOpacity>
+            <TouchableOpacity style={estilos.modalRechazar} onPress={async () => { if (!motivo.trim()) return Alert.alert("Motivo obligatorio", "Escribe un motivo."); const resultado = await rechazarSolicitud(solicitudRechazo.id, motivo); if (resultado !== false) { setSolicitudRechazo(null); Alert.alert("Solicitud rechazada", "El usuario podrá ver el motivo y corregir su publicación."); } }}><Text style={estilos.modalRechazarTexto}>Confirmar rechazo</Text></TouchableOpacity>
+          </View>
+        </View></View>
+      </Modal>
     </View>
   );
 }
@@ -129,6 +135,7 @@ const estilos = StyleSheet.create({
   titulo: { fontSize: 17, fontWeight: "bold", color: "#222", marginBottom: 6 },
   detalle: { fontSize: 13, color: "#555", marginTop: 2 },
   descripcion: { fontSize: 13, color: "#777", marginTop: 8, lineHeight: 18 },
+  motivo: { fontSize: 13, color: "#C47A00", marginTop: 8 },
   acciones: { flexDirection: "row", gap: 10, marginTop: 14 },
   accion: {
     flex: 1,
@@ -140,4 +147,11 @@ const estilos = StyleSheet.create({
   eliminarTexto: { color: "#E53935", fontWeight: "700" },
   aceptar: { backgroundColor: "#2E7D32" },
   aceptarTexto: { color: "#FFF", fontWeight: "700" },
+  modalFondo: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", padding: 20 },
+  modal: { backgroundColor: "#FFF", borderRadius: 14, padding: 20 }, modalTitulo: { fontSize: 20, fontWeight: "bold" }, modalAyuda: { color: "#666", marginVertical: 8 },
+  modalInput: { borderWidth: 1, borderColor: "#DDD", borderRadius: 10, minHeight: 90, padding: 12, textAlignVertical: "top" }, modalAcciones: { flexDirection: "row", justifyContent: "flex-end", gap: 24, marginTop: 16 },
+  modalCancelar: { paddingVertical: 12, paddingHorizontal: 14 },
+  modalCancelarTexto: { color: "#555", fontWeight: "600" },
+  modalRechazar: { backgroundColor: "#D32F2F", borderRadius: 8, paddingVertical: 12, paddingHorizontal: 14 },
+  modalRechazarTexto: { color: "#FFF", fontWeight: "700" },
 });

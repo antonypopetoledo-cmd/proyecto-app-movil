@@ -1,15 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
-import { getEventos } from "../services/eventosService";
+import { getEventos, suscribirEventos, getEliminados, aplicarCambiosLocales } from "../services/eventosService";
 import useSolicitudes from "./useSolicitudes";
 
-export default function useEventos() {
+export default function useEventos(sesion) {
   const [eventosBase, setEventos] = useState([]);
   // Los eventos aceptados desde las solicitudes se muestran junto a los demás.
-  const { aprobados } = useSolicitudes();
-  const eventos = useMemo(
-    () => [...aprobados, ...eventosBase],
-    [aprobados, eventosBase]
-  );
+  const { aprobados } = useSolicitudes(sesion);
+  const eventos = useMemo(() => eventosBase, [eventosBase]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -19,7 +16,9 @@ export default function useEventos() {
       esRefresh ? setRefreshing(true) : setLoading(true);
       setError(null);
       const data = await getEventos();
-      setEventos(data);
+      const eliminados = await getEliminados();
+      const aprobadosLocales = await Promise.all(aprobados.map(aplicarCambiosLocales));
+      setEventos([...aprobadosLocales, ...data].filter((evento) => !eliminados.includes(String(evento.id))));
     } catch (e) {
       setError(e.message || "No se pudieron cargar los eventos");
     } finally {
@@ -30,7 +29,8 @@ export default function useEventos() {
 
   useEffect(() => {
     cargar();
-  }, []);
+    return suscribirEventos(() => cargar(true));
+  }, [aprobados]);
 
   return {
     eventos,

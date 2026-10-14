@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import useEventos from "../hooks/useEventos";
+import { cerrarSesion as cerrarSesionUsuario } from "../services/authService";
 
 function EventCard({ evento, esFavorito, onToggleFavorito, onPress }) {
   return (
@@ -53,9 +54,9 @@ function EventCard({ evento, esFavorito, onToggleFavorito, onPress }) {
   );
 }
 
-export default function CatalogScreen({ navigation }) {
+export default function CatalogScreen({ navigation, sesion }) {
   const { eventos, loading, refreshing, error, recargar, reintentar } =
-    useEventos();
+    useEventos(sesion);
 
   const [busqueda, setBusqueda] = useState("");
   const [categoria, setCategoria] = useState("Todos");
@@ -63,10 +64,12 @@ export default function CatalogScreen({ navigation }) {
   const [soloFavoritos, setSoloFavoritos] = useState(false);
 
   const cerrarSesion = () => {
-    navigation.getParent().reset({
+    const navegacionPrincipal = navigation.getParent();
+    navegacionPrincipal?.reset({
       index: 0,
       routes: [{ name: "Login" }],
     });
+    cerrarSesionUsuario();
   };
 
   const toggleFavorito = (id) => {
@@ -74,7 +77,6 @@ export default function CatalogScreen({ navigation }) {
       prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]
     );
   };
-
   const categorias = useMemo(
     () => ["Todos", ...new Set(eventos.map((e) => e.categoria))],
     [eventos]
@@ -277,6 +279,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   favIcon: { fontSize: 18 },
+  accionesAdmin: { flexDirection: "row", gap: 18, marginTop: 12 },
+  editar: { color: "#5B4BDB", fontWeight: "700" },
+  eliminar: { color: "#E53935", fontWeight: "700" },
   center: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
   mensaje: { marginTop: 10, fontSize: 15, color: "#555", textAlign: "center" },
   mensajeVacio: { textAlign: "center", color: "#777", marginTop: 30 },

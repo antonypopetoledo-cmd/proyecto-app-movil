@@ -9,9 +9,11 @@ import {
   Linking,
 } from "react-native";
 import { Image } from "expo-image";
+import { eliminarEvento } from "../services/eventosService";
 
-export default function DetalleEventoScreen({ route, navigation }) {
+export default function DetalleEventoScreen({ route, navigation, sesion }) {
   const { evento } = route.params;
+  const esSolicitud = route.params.esSolicitud === true;
   const [recordatorio, setRecordatorio] = useState(false);
 
   const toggleRecordatorio = () => {
@@ -30,6 +32,28 @@ export default function DetalleEventoScreen({ route, navigation }) {
   const abrirEnlace = () => {
     Linking.openURL(evento.enlace);
   };
+
+  const editar = () => navigation.navigate("EditarEvento", { evento });
+
+  const eliminar = () => Alert.alert(
+    "Eliminar evento",
+    `¿Deseas eliminar "${evento.titulo}"?`,
+    [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: async () => {
+          const resultado = await eliminarEvento(evento.id, sesion);
+          if (!resultado.ok) {
+            Alert.alert("Acceso denegado", resultado.mensaje);
+            return;
+          }
+          navigation.goBack();
+        },
+      },
+    ]
+  );
 
   return (
     <View style={styles.container}>
@@ -88,19 +112,24 @@ export default function DetalleEventoScreen({ route, navigation }) {
             <Text style={styles.botonSecundarioText}>🗺️ Ver en Google Maps</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
+          {sesion?.rol !== "administrador" ? <TouchableOpacity
             style={[styles.boton, recordatorio && styles.botonActivo]}
             onPress={toggleRecordatorio}
           >
-            <Text style={styles.botonText}>
-              {recordatorio ? "🔔 Recordatorio activado" : "🔔 Recordarme"}
-            </Text>
-          </TouchableOpacity>
+            <Text style={styles.botonText}>{recordatorio ? "🔔 Recordatorio activado" : "🔔 Recordarme"}</Text>
+          </TouchableOpacity> : null}
 
-          <TouchableOpacity
-            style={styles.botonSecundario}
-            onPress={() => navigation.goBack()}
-          >
+          {sesion?.rol === "administrador" && !esSolicitud ? (
+            <>
+              <TouchableOpacity style={styles.boton} onPress={editar}>
+                <Text style={styles.botonText}>✏️ Editar evento</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.botonEliminar} onPress={eliminar}>
+                <Text style={styles.botonEliminarText}>🗑️ Eliminar evento</Text>
+              </TouchableOpacity>
+            </>
+          ) : null}
+          <TouchableOpacity style={styles.botonSecundario} onPress={() => navigation.goBack()}>
             <Text style={styles.botonSecundarioText}>← Volver</Text>
           </TouchableOpacity>
         </View>
@@ -147,4 +176,13 @@ const styles = StyleSheet.create({
     borderColor: "#5B4BDB",
   },
   botonSecundarioText: { color: "#5B4BDB", fontWeight: "600" },
+  botonEliminar: {
+    padding: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: "#E53935",
+  },
+  botonEliminarText: { color: "#E53935", fontWeight: "700", fontSize: 15 },
 });
