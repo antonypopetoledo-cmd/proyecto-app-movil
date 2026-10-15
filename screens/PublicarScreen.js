@@ -127,12 +127,12 @@ export default function PublicarScreen({ sesion, navigation }) {
           placeholder: "Ej. Live Nation Perú",
         })}
         {campo("Enlace oficial", "enlace", {
-          placeholder: "https://...",
+          placeholder: "Escribir dirección del sitio web (opcional)",
           autoCapitalize: "none",
           keyboardType: "url",
         })}
         {campo("Imagen (enlace)", "imagen", {
-          placeholder: "https://...",
+          placeholder: "Escribir dirección de la imagen (opcional)",
           autoCapitalize: "none",
           keyboardType: "url",
         })}

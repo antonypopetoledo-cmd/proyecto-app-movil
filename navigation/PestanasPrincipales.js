@@ -13,14 +13,28 @@ export default function PestanasPrincipales({ sesion }) {
   const { pendientes } = useSolicitudes(sesion);
 
   return (
-    <Pestanas.Navigator
+        <Pestanas.Navigator
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#5B4BDB',
         tabBarInactiveTintColor: '#777',
         tabBarShowLabel: false,
+        // Configuración de la barra entera
+        tabBarStyle: {
+          backgroundColor: '#FFFFFF',
+          height: 65,
+          borderTopWidth: 1,
+          borderTopColor: '#EAEAEA',
+        },
+        // 👇 ESTO COMPLETA EL CENTRADO PERFECTO DE CADA ICONO
+        tabBarItemStyle: {
+          justifyContent: 'center', // Centra el icono verticalmente dentro de su espacio
+          alignItems: 'center',     // Centra el icono horizontalmente
+          height: '100%',
+        }
       }}
     >
+
       <Pestanas.Screen name="Eventos" options={{ tabBarIcon: ({ color, size }) => <MaterialIcons name="calendar-month" color={color} size={size} /> }}>
         {(props) => <CatalogScreen {...props} sesion={sesion} />}
       </Pestanas.Screen>

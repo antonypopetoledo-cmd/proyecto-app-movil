@@ -11,14 +11,35 @@ import {
   ScrollView,
 } from "react-native";
 import { Image } from "expo-image";
+import { useRoute } from "@react-navigation/native"; // Importante para leer los parámetros pasados
 import useEventos from "../hooks/useEventos";
 import { cerrarSesion as cerrarSesionUsuario } from "../services/authService";
 
+// Diccionario para traducir los IDs seleccionados a los textos de tus categorías reales
+const TRADUCCION_CATEGORIAS = {
+  kpop: "K-pop",
+  conciertos: "Conciertos",
+  teatro: "Teatro",
+  arte: "Arte y Cultura",
+  tecnologia: "Tecnología",
+  gaming: "Gaming",
+  anime: "Anime",
+  emprendimiento: "Emprendimiento",
+  universitarios: "Eventos universitarios",
+  gastronomia: "Ferias gastronómicas",
+  deportes: "Deportes",
+  festivales: "Festivales",
+};
+
 function EventCard({ evento, esFavorito, onToggleFavorito, onPress }) {
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={onPress}>
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.85}
+      onPress={onPress}
+    >
       <View>
-                {evento.imagen ? (
+        {evento.imagen ? (
           <Image
             source={{ uri: evento.imagen }}
             style={styles.image}
@@ -58,6 +79,8 @@ export default function CatalogScreen({ navigation, sesion }) {
   const { eventos, loading, refreshing, error, recargar, reintentar } =
     useEventos(sesion);
 
+  const route = useRoute(); // Acceder a los parámetros enviados por InterestsScreen
+
   const [busqueda, setBusqueda] = useState("");
   const [categoria, setCategoria] = useState("Todos");
   const [favoritos, setFavoritos] = useState([]);
@@ -74,24 +97,63 @@ export default function CatalogScreen({ navigation, sesion }) {
 
   const toggleFavorito = (id) => {
     setFavoritos((prev) =>
-      prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id],
     );
   };
+
   const categorias = useMemo(
     () => ["Todos", ...new Set(eventos.map((e) => e.categoria))],
-    [eventos]
+    [eventos],
   );
 
   const eventosFiltrados = useMemo(() => {
-    return eventos.filter((e) => {
+    // 1. Obtener los IDs enviados por la navegación (si no hay ninguno, usamos la sesión o vacío)
+    const interesesIds = route.params?.intereses || sesion?.intereses || [];
+
+    // 2. Mapear esos IDs (ej: 'arte') a strings legibles (ej: 'Arte y Cultura')
+    const misInteresesTexto = interesesIds.map(
+      (id) => TRADUCCION_CATEGORIAS[id] || id,
+    );
+
+    // 3. Filtrar por búsqueda, categoría activa y favoritos de manera común
+    const filtrados = eventos.filter((e) => {
       const coincideTexto =
         e.titulo.toLowerCase().includes(busqueda.toLowerCase()) ||
         e.lugar.toLowerCase().includes(busqueda.toLowerCase());
-      const coincideCategoria = categoria === "Todos" || e.categoria === categoria;
+      const coincideCategoria =
+        categoria === "Todos" || e.categoria === categoria;
       const coincideFav = !soloFavoritos || favoritos.includes(e.id);
       return coincideTexto && coincideCategoria && coincideFav;
     });
-  }, [eventos, busqueda, categoria, soloFavoritos, favoritos]);
+
+    // 4. Reordenar priorizando de forma dinámica los intereses reales que elegiste
+    if (categoria === "Todos") {
+      return [...filtrados].sort((a, b) => {
+        const limpiar = (str) => str.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+        const aEsInteres = misInteresesTexto.some((interesText) =>
+          limpiar(a.categoria).includes(limpiar(interesText)),
+        );
+        const bEsInteres = misInteresesTexto.some((interesText) =>
+          limpiar(b.categoria).includes(limpiar(interesText)),
+        );
+
+        if (aEsInteres && !bEsInteres) return -1;
+        if (!aEsInteres && bEsInteres) return 1;
+        return 0;
+      });
+    }
+
+    return filtrados;
+  }, [
+    eventos,
+    busqueda,
+    categoria,
+    soloFavoritos,
+    favoritos,
+    sesion,
+    route.params?.intereses,
+  ]);
 
   const renderContenido = () => {
     if (loading) {
@@ -123,7 +185,9 @@ export default function CatalogScreen({ navigation, sesion }) {
             evento={item}
             esFavorito={favoritos.includes(item.id)}
             onToggleFavorito={toggleFavorito}
-            onPress={() => navigation.navigate("DetalleEvento", { evento: item })}
+            onPress={() =>
+              navigation.navigate("DetalleEvento", { evento: item })
+            }
           />
         )}
         contentContainerStyle={styles.list}
@@ -165,7 +229,9 @@ export default function CatalogScreen({ navigation, sesion }) {
             style={[styles.chip, soloFavoritos && styles.chipActivo]}
             onPress={() => setSoloFavoritos(!soloFavoritos)}
           >
-            <Text style={[styles.chipText, soloFavoritos && styles.chipTextActivo]}>
+            <Text
+              style={[styles.chipText, soloFavoritos && styles.chipTextActivo]}
+            >
               ❤️ Favoritos
             </Text>
           </TouchableOpacity>
@@ -176,7 +242,10 @@ export default function CatalogScreen({ navigation, sesion }) {
               onPress={() => setCategoria(cat)}
             >
               <Text
-                style={[styles.chipText, categoria === cat && styles.chipTextActivo]}
+                style={[
+                  styles.chipText,
+                  categoria === cat && styles.chipTextActivo,
+                ]}
               >
                 {cat}
               </Text>
@@ -208,7 +277,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   image: { width: "100%", height: 150 },
-    sinImagen: {
+  sinImagen: {
     backgroundColor: "#E0DDFF",
     justifyContent: "center",
     alignItems: "center",
@@ -243,8 +312,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   precio: { fontSize: 12, fontWeight: "700", color: "#2E7D32" },
-
-  // Nuevos
   filtros: { paddingHorizontal: 15, paddingTop: 12 },
   input: {
     backgroundColor: "#FFF",
@@ -278,19 +345,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  favIcon: { fontSize: 18 },
-  accionesAdmin: { flexDirection: "row", gap: 18, marginTop: 12 },
-  editar: { color: "#5B4BDB", fontWeight: "700" },
-  eliminar: { color: "#E53935", fontWeight: "700" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
-  mensaje: { marginTop: 10, fontSize: 15, color: "#555", textAlign: "center" },
-  mensajeVacio: { textAlign: "center", color: "#777", marginTop: 30 },
+  favIcon: { fontSize: 16, textAlign: "center" },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  mensaje: { marginTop: 10, color: "#555", fontSize: 16 },
+  mensajeVacio: {
+    textAlign: "center",
+    marginTop: 40,
+    color: "#777",
+    fontSize: 16,
+  },
   retryButton: {
-    marginTop: 14,
+    marginTop: 15,
     backgroundColor: "#5B4BDB",
     paddingVertical: 10,
-    paddingHorizontal: 22,
-    borderRadius: 20,
+    paddingHorizontal: 20,
+    borderRadius: 8,
   },
   retryText: { color: "#FFF", fontWeight: "600" },
 });
