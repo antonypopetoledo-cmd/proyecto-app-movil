@@ -32,6 +32,7 @@ export default function PublicarScreen({ sesion, navigation }) {
   const [error, setError] = useState("");
   const [mostrarPublicaciones, setMostrarPublicaciones] = useState(false);
   const [mostrarCalendario, setMostrarCalendario] = useState(false);
+  const [fechaCalendario, setFechaCalendario] = useState(new Date());
 
   const cambiar = (campo) => (texto) =>
     setForm((prev) => ({ ...prev, [campo]: texto }));
@@ -105,7 +106,17 @@ export default function PublicarScreen({ sesion, navigation }) {
         <>
           <Text style={estilos.label}>Fecha *</Text>
           <TouchableOpacity style={estilos.input} onPress={() => setMostrarCalendario(true)}><Text>{form.fecha || "Seleccionar fecha"}</Text></TouchableOpacity>
-          {mostrarCalendario ? <DateTimePicker value={new Date()} mode="date" onValueChange={(evento, fecha) => { setMostrarCalendario(false); if (fecha) cambiar("fecha")(fecha.toLocaleDateString("es-PE")); }} /> : null}
+          {mostrarCalendario ? <DateTimePicker
+            value={fechaCalendario}
+            mode="date"
+            onValueChange={(evento, fecha) => {
+              if (!fecha) return;
+              setFechaCalendario(fecha);
+              cambiar("fecha")(fecha.toLocaleDateString("es-PE"));
+              setMostrarCalendario(false);
+            }}
+            onDismiss={() => setMostrarCalendario(false)}
+          /> : null}
         </>
         {campo("Hora", "hora", { placeholder: "Ej. 8:00 p. m." })}
         {campo("Lugar *", "lugar", {
