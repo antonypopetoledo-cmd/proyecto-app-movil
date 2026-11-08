@@ -86,14 +86,13 @@ export default function CatalogScreen({ navigation, sesion }) {
   const [favoritos, setFavoritos] = useState([]);
   const [soloFavoritos, setSoloFavoritos] = useState(false);
 
-  const cerrarSesion = () => {
-    const navegacionPrincipal = navigation.getParent();
-    navegacionPrincipal?.reset({
-      index: 0,
-      routes: [{ name: "Login" }],
-    });
-    cerrarSesionUsuario();
-  };
+  const cerrarSesion = async () => {
+  try {
+    await cerrarSesionUsuario();
+  } catch (e) {
+    console.log("No se pudo cerrar sesión:", e.message);
+  }
+};
 
   const toggleFavorito = (id) => {
     setFavoritos((prev) =>
@@ -108,7 +107,7 @@ export default function CatalogScreen({ navigation, sesion }) {
 
   const eventosFiltrados = useMemo(() => {
     // 1. Obtener los IDs enviados por la navegación (si no hay ninguno, usamos la sesión o vacío)
-    const interesesIds = route.params?.intereses || sesion?.intereses || [];
+    const interesesIds = sesion?.intereses || [];
 
     // 2. Mapear esos IDs (ej: 'arte') a strings legibles (ej: 'Arte y Cultura')
     const misInteresesTexto = interesesIds.map(

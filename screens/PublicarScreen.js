@@ -12,11 +12,13 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import useSolicitudes from "../hooks/useSolicitudes";
+import { INTERESES } from "../data/categorias";
 
 const CAMPOS_VACIOS = {
   titulo: "",
   categoria: "",
   fecha: "",
+  fechaInicio: "",
   hora: "",
   lugar: "",
   precio: "",
@@ -26,13 +28,20 @@ const CAMPOS_VACIOS = {
   descripcion: "",
 };
 
+// Fecha real en el mismo formato que eventos.json: 2026-11-20T12:00:00
+const aFechaISO = (f) => {
+  const dos = (n) => String(n).padStart(2, "0");
+  return `${f.getFullYear()}-${dos(f.getMonth() + 1)}-${dos(f.getDate())}T12:00:00`;
+};
+
 export default function PublicarScreen({ sesion, navigation }) {
   const { enviarSolicitud } = useSolicitudes(sesion);
   const [form, setForm] = useState(CAMPOS_VACIOS);
   const [error, setError] = useState("");
-  const [mostrarPublicaciones, setMostrarPublicaciones] = useState(false);
   const [mostrarCalendario, setMostrarCalendario] = useState(false);
   const [fechaCalendario, setFechaCalendario] = useState(new Date());
+
+  const esAdmin = sesion?.rol === "administrador";
 
   const cambiar = (campo) => (texto) =>
     setForm((prev) => ({ ...prev, [campo]: texto }));
@@ -60,8 +69,10 @@ export default function PublicarScreen({ sesion, navigation }) {
     await enviarSolicitud(form);
     setForm(CAMPOS_VACIOS);
     Alert.alert(
-      "Solicitud enviada",
-      "Tu evento quedó pendiente de revisión. Si es aceptado, aparecerá en la pestaña Eventos."
+      esAdmin ? "Evento publicado" : "Solicitud enviada",
+      esAdmin
+        ? "Tu evento ya aparece en la pestaña Eventos."
+        : "Tu evento quedó pendiente de revisión. Si es aceptado, aparecerá en la pestaña Eventos."
     );
   };
 
@@ -89,7 +100,9 @@ export default function PublicarScreen({ sesion, navigation }) {
       <View style={estilos.header}>
         <Text style={estilos.headerTitulo}>Publicar un evento</Text>
         <Text style={estilos.headerSubtitulo}>
-          Envía tu solicitud y la revisaremos antes de publicarla
+          {esAdmin
+            ? "Tu evento se publicará de inmediato"
+            : "Envía tu solicitud y la revisaremos antes de publicarla"}
         </Text>
       </View>
 
@@ -100,23 +113,48 @@ export default function PublicarScreen({ sesion, navigation }) {
         {campo("Nombre del evento *", "titulo", {
           placeholder: "Ej. Feria de Anime",
         })}
-        {campo("Categoría *", "categoria", {
-          placeholder: "Ej. 🍥 Anime",
-        })}
+
+        <Text style={estilos.label}>Categoría *</Text>
+        <View style={estilos.categorias}>
+          {INTERESES.map((item) => {
+            const activa = form.categoria === item.label;
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={[estilos.chip, activa && estilos.chipActivo]}
+                onPress={() => cambiar("categoria")(item.label)}
+                activeOpacity={0.8}
+              >
+                <Text style={[estilos.chipTexto, activa && estilos.chipTextoActivo]}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
         <>
           <Text style={estilos.label}>Fecha *</Text>
-          <TouchableOpacity style={estilos.input} onPress={() => setMostrarCalendario(true)}><Text>{form.fecha || "Seleccionar fecha"}</Text></TouchableOpacity>
-          {mostrarCalendario ? <DateTimePicker
-            value={fechaCalendario}
-            mode="date"
-            onValueChange={(evento, fecha) => {
-              if (!fecha) return;
-              setFechaCalendario(fecha);
-              cambiar("fecha")(fecha.toLocaleDateString("es-PE"));
-              setMostrarCalendario(false);
-            }}
-            onDismiss={() => setMostrarCalendario(false)}
-          /> : null}
+          <TouchableOpacity style={estilos.input} onPress={() => setMostrarCalendario(true)}>
+            <Text>{form.fecha || "Seleccionar fecha"}</Text>
+          </TouchableOpacity>
+          {mostrarCalendario ? (
+            <DateTimePicker
+              value={fechaCalendario}
+              mode="date"
+              onValueChange={(evento, fecha) => {
+                if (!fecha) return;
+                setFechaCalendario(fecha);
+                setForm((prev) => ({
+                  ...prev,
+                  fecha: fecha.toLocaleDateString("es-PE"),
+                  fechaInicio: aFechaISO(fecha),
+                }));
+                setMostrarCalendario(false);
+              }}
+              onDismiss={() => setMostrarCalendario(false)}
+            />
+          ) : null}
         </>
         {campo("Hora", "hora", { placeholder: "Ej. 8:00 p. m." })}
         {campo("Lugar *", "lugar", {
@@ -148,7 +186,9 @@ export default function PublicarScreen({ sesion, navigation }) {
           onPress={enviar}
           activeOpacity={0.8}
         >
-          <Text style={estilos.botonTexto}>Enviar solicitud</Text>
+          <Text style={estilos.botonTexto}>
+            {esAdmin ? "Publicar evento" : "Enviar solicitud"}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -174,6 +214,23 @@ const estilos = StyleSheet.create({
     color: "#222",
   },
   inputMultilinea: { minHeight: 90, textAlignVertical: "top" },
+  categorias: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 14,
+  },
+  chip: {
+    borderWidth: 1.5,
+    borderColor: "#DDD",
+    backgroundColor: "#FFF",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+  },
+  chipActivo: { backgroundColor: "#5B4BDB", borderColor: "#5B4BDB" },
+  chipTexto: { fontSize: 13, color: "#444", fontWeight: "600" },
+  chipTextoActivo: { color: "#FFF" },
   error: { color: "#E53935", fontSize: 13, marginBottom: 10 },
   boton: {
     backgroundColor: "#5B4BDB",
@@ -187,18 +244,4 @@ const estilos = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
-  botonSecundario: {
-    padding: 14,
-    borderRadius: 10,
-    alignItems: "center",
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: "#5B4BDB",
-  },
-  botonSecundarioTexto: { color: "#5B4BDB", fontWeight: "700" },
-  misSolicitudes: { fontSize: 19, fontWeight: "bold", color: "#222", marginTop: 28, marginBottom: 10 },
-  solicitudPropia: { backgroundColor: "#FFF", borderRadius: 10, padding: 12, marginBottom: 8, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  solicitudTitulo: { flex: 1, color: "#333", fontWeight: "600" },
-  cancelar: { color: "#E53935", fontWeight: "700", marginLeft: 10 },
-  aprobado: { color: "#2E7D32", fontWeight: "700", marginLeft: 10 },
 });
