@@ -9,36 +9,55 @@ import {
   Linking,
 } from "react-native";
 import { Image } from "expo-image";
+import { MaterialIcons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { eliminarEvento } from "../services/eventosService";
+
+// Fila con icono + etiqueta y su valor debajo
+const Dato = ({ icono, etiqueta, children }) => (
+  <>
+    <View style={styles.etiquetaFila}>
+      <MaterialIcons name={icono} size={16} color="#777" />
+      <Text style={styles.label}>{etiqueta}</Text>
+    </View>
+    <Text style={styles.valor}>{children}</Text>
+  </>
+);
 
 export default function DetalleEventoScreen({ route, navigation, sesion }) {
   const { evento } = route.params;
   const esSolicitud = route.params.esSolicitud === true;
   const [recordatorio, setRecordatorio] = useState(false);
+  const insets = useSafeAreaInsets();
+
+  const esAdmin = sesion?.rol === "administrador";
+  const puedeGestionar = esAdmin && !esSolicitud;
 
   const toggleRecordatorio = () => {
     setRecordatorio(!recordatorio);
     Alert.alert(
       recordatorio ? "Recordatorio quitado" : "Recordatorio activado",
-      evento.titulo
+      evento.titulo,
     );
   };
 
   const abrirMapa = () => {
     const query = encodeURIComponent(evento.lugar);
-    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
+    Linking.openURL(
+      `https://www.google.com/maps/search/?api=1&query=${query}`,
+    ).catch(() => Alert.alert("No se pudo abrir el mapa"));
   };
 
   const abrirEnlace = () => {
-    Linking.openURL(evento.enlace);
+    Linking.openURL(evento.enlace).catch(() =>
+      Alert.alert("No se pudo abrir el enlace"),
+    );
   };
 
   const editar = () => navigation.navigate("EditarEvento", { evento });
 
-  const eliminar = () => Alert.alert(
-    "Eliminar evento",
-    `¿Deseas eliminar "${evento.titulo}"?`,
-    [
+  const eliminar = () =>
+    Alert.alert("Eliminar evento", `¿Deseas eliminar "${evento.titulo}"?`, [
       { text: "Cancelar", style: "cancel" },
       {
         text: "Eliminar",
@@ -52,11 +71,40 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
           navigation.goBack();
         },
       },
-    ]
-  );
+    ]);
 
   return (
     <View style={styles.container}>
+      {/* Barra fija sobre la imagen: volver y, para el admin, editar y eliminar */}
+      <View style={[styles.barraSuperior, { top: insets.top + 8 }]}>
+        <TouchableOpacity
+          style={styles.botonCircular}
+          onPress={() => navigation.goBack()}
+          accessibilityLabel="Volver"
+        >
+          <MaterialIcons name="arrow-back" size={22} color="#222" />
+        </TouchableOpacity>
+
+        {puedeGestionar ? (
+          <View style={styles.accionesGestion}>
+            <TouchableOpacity
+              style={styles.botonCircular}
+              onPress={editar}
+              accessibilityLabel="Editar"
+            >
+              <MaterialIcons name="edit" size={20} color="#5B4BDB" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.botonCircular}
+              onPress={eliminar}
+              accessibilityLabel="Eliminar"
+            >
+              <MaterialIcons name="delete-outline" size={22} color="#E53935" />
+            </TouchableOpacity>
+          </View>
+        ) : null}
+      </View>
+
       <ScrollView>
         {evento.imagen ? (
           <Image
@@ -67,7 +115,7 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
           />
         ) : (
           <View style={[styles.image, styles.sinImagen]}>
-            <Text style={styles.sinImagenIcono}>🎉</Text>
+            <MaterialIcons name="event" size={64} color="#5B4BDB" />
           </View>
         )}
 
@@ -79,74 +127,104 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
 
           <Text style={styles.titulo}>{evento.titulo}</Text>
 
-          <Text style={styles.label}>📅 Fecha</Text>
-          <Text style={styles.valor}>
+          <Dato icono="event" etiqueta="Fecha">
             {evento.fecha}
             {evento.hora ? ` · ${evento.hora}` : ""}
-          </Text>
+          </Dato>
 
-          <Text style={styles.label}>📍 Lugar</Text>
-          <Text style={styles.valor}>{evento.lugar}</Text>
+          <Dato icono="place" etiqueta="Lugar">
+            {evento.lugar}
+          </Dato>
 
           {evento.organizador ? (
-            <>
-              <Text style={styles.label}>🎤 Organizador</Text>
-              <Text style={styles.valor}>{evento.organizador}</Text>
-            </>
+            <Dato icono="mic" etiqueta="Organizador">
+              {evento.organizador}
+            </Dato>
           ) : null}
 
           {evento.descripcion ? (
-            <>
-              <Text style={styles.label}>📝 Descripción</Text>
-              <Text style={styles.valor}>{evento.descripcion}</Text>
-            </>
+            <Dato icono="notes" etiqueta="Descripción">
+              {evento.descripcion}
+            </Dato>
           ) : null}
-
-          {evento.enlace ? (
-            <TouchableOpacity style={styles.boton} onPress={abrirEnlace}>
-              <Text style={styles.botonText}>🎟️ Ir al sitio oficial</Text>
-            </TouchableOpacity>
-          ) : null}
-
-          <TouchableOpacity style={styles.botonSecundario} onPress={abrirMapa}>
-            <Text style={styles.botonSecundarioText}>🗺️ Ver en Google Maps</Text>
-          </TouchableOpacity>
-
-          {sesion?.rol !== "administrador" ? <TouchableOpacity
-            style={[styles.boton, recordatorio && styles.botonActivo]}
-            onPress={toggleRecordatorio}
-          >
-            <Text style={styles.botonText}>{recordatorio ? "🔔 Recordatorio activado" : "🔔 Recordarme"}</Text>
-          </TouchableOpacity> : null}
-
-          {sesion?.rol === "administrador" && !esSolicitud ? (
-            <>
-              <TouchableOpacity style={styles.boton} onPress={editar}>
-                <Text style={styles.botonText}>✏️ Editar evento</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.botonEliminar} onPress={eliminar}>
-                <Text style={styles.botonEliminarText}>🗑️ Eliminar evento</Text>
-              </TouchableOpacity>
-            </>
-          ) : null}
-          <TouchableOpacity style={styles.botonSecundario} onPress={() => navigation.goBack()}>
-            <Text style={styles.botonSecundarioText}>← Volver</Text>
-          </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Botones fijos abajo */}
+      <View style={[styles.pie, { paddingBottom: insets.bottom + 12 }]}>
+        {/* Acción principal para quien asiste. Aquí irá el botón "Asistiré". */}
+        {!esAdmin ? (
+          <TouchableOpacity
+            style={[styles.botonPrincipal, recordatorio && styles.botonActivo]}
+            onPress={toggleRecordatorio}
+            activeOpacity={0.85}
+          >
+            <MaterialIcons
+              name={recordatorio ? "notifications-active" : "notifications-none"}
+              size={20}
+              color="#FFF"
+            />
+            <Text style={styles.botonPrincipalTexto}>
+              {recordatorio ? "Recordatorio activado" : "Recordarme"}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {/* Acciones de consulta */}
+        <View style={styles.filaAcciones}>
+          {evento.enlace ? (
+            <TouchableOpacity
+              style={styles.botonSecundario}
+              onPress={abrirEnlace}
+              activeOpacity={0.85}
+            >
+              <MaterialIcons
+                name="confirmation-number"
+                size={20}
+                color="#5B4BDB"
+              />
+              <Text style={styles.botonSecundarioText}>Sitio oficial</Text>
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity
+            style={styles.botonSecundario}
+            onPress={abrirMapa}
+            activeOpacity={0.85}
+          >
+            <MaterialIcons name="map" size={20} color="#5B4BDB" />
+            <Text style={styles.botonSecundarioText}>Mapa</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F4F6FF" },
+  barraSuperior: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    zIndex: 2,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  accionesGestion: { flexDirection: "row", gap: 8 },
+  botonCircular: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   image: { width: "100%", height: 240 },
   sinImagen: {
     backgroundColor: "#E0DDFF",
     justifyContent: "center",
     alignItems: "center",
   },
-  sinImagenIcono: { fontSize: 64 },
   content: { padding: 20 },
   rowTop: {
     flexDirection: "row",
@@ -155,34 +233,44 @@ const styles = StyleSheet.create({
   },
   categoria: { fontSize: 13, fontWeight: "700", color: "#5B4BDB" },
   precio: { fontSize: 13, fontWeight: "700", color: "#2E7D32" },
-  titulo: { fontSize: 22, fontWeight: "bold", color: "#222", marginBottom: 16 },
-  label: { fontSize: 13, color: "#777", marginTop: 10 },
-  valor: { fontSize: 16, color: "#222", marginTop: 2 },
-  boton: {
+  titulo: { fontSize: 22, fontWeight: "bold", color: "#222", marginBottom: 8 },
+  etiquetaFila: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 20,
+  },
+  label: { fontSize: 13, color: "#777" },
+  valor: { fontSize: 16, color: "#222", marginTop: 4, lineHeight: 22 },
+  pie: {
+    padding: 16,
+    gap: 10,
+    backgroundColor: "#FFF",
+    borderTopWidth: 1,
+    borderTopColor: "#E5E5EA",
+  },
+  botonPrincipal: {
+    flexDirection: "row",
+    gap: 8,
     backgroundColor: "#5B4BDB",
-    padding: 14,
+    paddingVertical: 14,
     borderRadius: 12,
     alignItems: "center",
-    marginTop: 10,
+    justifyContent: "center",
   },
   botonActivo: { backgroundColor: "#2E7D32" },
-  botonText: { color: "#FFF", fontWeight: "700", fontSize: 15 },
+  botonPrincipalTexto: { color: "#FFF", fontWeight: "700", fontSize: 15 },
+  filaAcciones: { flexDirection: "row", gap: 10 },
   botonSecundario: {
-    padding: 14,
+    flex: 1,
+    flexDirection: "row",
+    gap: 8,
+    paddingVertical: 13,
     borderRadius: 12,
     alignItems: "center",
-    marginTop: 10,
-    borderWidth: 1,
+    justifyContent: "center",
+    borderWidth: 1.5,
     borderColor: "#5B4BDB",
   },
-  botonSecundarioText: { color: "#5B4BDB", fontWeight: "600" },
-  botonEliminar: {
-    padding: 14,
-    borderRadius: 12,
-    alignItems: "center",
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: "#E53935",
-  },
-  botonEliminarText: { color: "#E53935", fontWeight: "700", fontSize: 15 },
+  botonSecundarioText: { color: "#5B4BDB", fontWeight: "600", fontSize: 14 },
 });

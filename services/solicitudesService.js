@@ -36,9 +36,11 @@ export const getRechazados = async () => sinDuplicados(JSON.parse((await AsyncSt
 const esAdmin = (sesion) => sesion?.rol === "administrador";
 
 export const enviarSolicitud = async (datos, sesion) => {
-  const pendientes = await getPendientes();
-  const solicitud = { id: `sol-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, ...datos, titulo: datos.titulo.trim(), creador: sesion.email, estado: "pendiente", motivoRechazo: null };
-  await guardar(CLAVE_PENDIENTES, sinDuplicados([solicitud, ...pendientes])); avisar(); return solicitud;
+  const admin = esAdmin(sesion);
+  const evento = { id: `sol-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, ...datos, titulo: datos.titulo.trim(), creador: sesion.email, estado: admin ? "aprobado" : "pendiente", motivoRechazo: null };
+  if (admin) await guardar(CLAVE_APROBADOS, sinDuplicados([evento, ...(await getAprobados())]));
+  else await guardar(CLAVE_PENDIENTES, sinDuplicados([evento, ...(await getPendientes())]));
+  avisar(); return evento;
 };
 export const eliminarSolicitud = async (id, sesion) => {
   const pendientes = await getPendientes();

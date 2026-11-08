@@ -1,43 +1,153 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  sendPasswordResetEmail,
+  onAuthStateChanged,
+} from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { auth, db } from "./firebaseConfig";
 
-const CLAVE_USUARIOS = "limago.usuarios";
-const CLAVE_SESION = "limago.sesion";
-const ADMINISTRADOR = { email: "admin@limago.com", password: "admin1234", rol: "administrador" };
-const USUARIO_PRUEBA = { email: "jhon@gmail.com", password: "12345678", rol: "usuario" };
+// Cuenta de prueba: hay que crearla una vez desde el formulario de registro
+export const USUARIO_PRUEBA = { email: "jhon@gmail.com", password: "12345678" };
+
 const oyentes = new Set();
+let sesionActual = null;
 
 const normalizar = (email) => email.trim().toLowerCase();
 const avisar = () => oyentes.forEach((fn) => fn());
 
-export { USUARIO_PRUEBA };
-export const suscribirSesion = (fn) => { oyentes.add(fn); return () => oyentes.delete(fn); };
-
-export const inicializarAuth = async () => {
-  const guardados = JSON.parse((await AsyncStorage.getItem(CLAVE_USUARIOS)) || "[]");
-  const usuarios = [ADMINISTRADOR, USUARIO_PRUEBA, ...guardados];
-  const unicos = usuarios.filter((u, i, lista) => lista.findIndex((x) => x.email === u.email) === i);
-  await AsyncStorage.setItem(CLAVE_USUARIOS, JSON.stringify(unicos));
-  return JSON.parse((await AsyncStorage.getItem(CLAVE_SESION)) || "null");
+export const suscribirSesion = (fn) => {
+  oyentes.add(fn);
+  return () => oyentes.delete(fn);
 };
 
-export const registrarUsuario = async (email, password) => {
-  const usuarios = JSON.parse((await AsyncStorage.getItem(CLAVE_USUARIOS)) || "[]");
-  const correo = normalizar(email);
-  if (usuarios.some((u) => u.email === correo)) return { ok: false, mensaje: "Ya existe una cuenta con ese correo." };
-  await AsyncStorage.setItem(CLAVE_USUARIOS, JSON.stringify([...usuarios, { email: correo, password, rol: "usuario" }]));
-  return iniciarSesionConCuenta(correo, password);
+export const obtenerSesion = async () => sesionActual;
+
+const traducirError = (e) => {
+  switch (e.code) {
+    case "auth/email-already-in-use":
+      return { titulo: "Correo en uso", mensaje: "Ya existe una cuenta con ese correo." };
+    case "auth/invalid-email":
+      return { titulo: "Correo inválido", mensaje: "Ingresa un correo con formato válido." };
+    case "auth/weak-password":
+      return { titulo: "Contraseña débil", mensaje: "Usa al menos 8 caracteres con un número." };
+    case "auth/invalid-credential":
+    case "auth/user-not-found":
+    case "auth/wrong-password":
+      return { titulo: "Datos incorrectos", mensaje: "El correo o la contraseña no son correctos." };
+    case "auth/too-many-requests":
+      return { titulo: "Demasiados intentos", mensaje: "Espera unos minutos e inténtalo de nuevo." };
+    case "auth/network-request-failed":
+      return { titulo: "Sin conexión", mensaje: "Revisa tu conexión a internet." };
+    default:
+      return { titulo: "Error", mensaje: "No se pudo completar la acción. Intenta de nuevo." };
+  }
+};
+
+// Combina el usuario de Auth con su perfil guardado en Firestore (usuarios/{uid})
+const cargarSesion = async (user) => {
+  const snap = await getDoc(doc(db, "usuarios", user.uid));
+  const datos = snap.exists() ? snap.data() : {};
+  const rol = datos.rol || "usuario";
+  sesionActual = {
+    uid: user.uid,
+    email: user.email,
+    nombre: datos.nombre || "",
+    apellido: datos.apellido || "",
+    rol,
+    intereses: datos.intereses || [],
+    // el administrador no pasa por la pantalla de intereses
+    interesesListo: datos.interesesListo === true || rol === "administrador",
+  };
+  return sesionActual;
+};
+
+const esperarAuth = () =>
+  auth.authStateReady
+    ? auth.authStateReady()
+    : new Promise((resolve) => {
+        const quitar = onAuthStateChanged(auth, () => {
+          quitar();
+          resolve();
+        });
+      });
+
+export const inicializarAuth = async () => {
+  await esperarAuth();
+  if (!auth.currentUser) {
+    sesionActual = null;
+    return null;
+  }
+  try {
+    return await cargarSesion(auth.currentUser);
+  } catch (e) {
+    console.log("No se pudo recuperar la sesión:", e.message);
+    sesionActual = null;
+    return null;
+  }
+};
+
+export const registrarUsuario = async ({ nombre, apellido, email, password }) => {
+  try {
+    const correo = normalizar(email);
+    const cred = await createUserWithEmailAndPassword(auth, correo, password);
+    await setDoc(doc(db, "usuarios", cred.user.uid), {
+      nombre: nombre.trim(),
+      apellido: apellido.trim(),
+      correo,
+      rol: "usuario",
+      intereses: [],
+      interesesListo: false,
+      creadoEn: new Date().toISOString(),
+    });
+    const sesion = await cargarSesion(cred.user);
+    avisar();
+    return { ok: true, sesion };
+  } catch (e) {
+    return { ok: false, ...traducirError(e) };
+  }
 };
 
 export const iniciarSesionConCuenta = async (email, password) => {
-  const usuarios = JSON.parse((await AsyncStorage.getItem(CLAVE_USUARIOS)) || "[]");
-  const usuario = usuarios.find((u) => u.email === normalizar(email));
-  if (!usuario) return { ok: false, titulo: "Cuenta inexistente", mensaje: "No existe una cuenta con ese correo. Crea una cuenta primero." };
-  if (usuario.password !== password) return { ok: false, titulo: "Contraseña incorrecta", mensaje: "La contraseña no coincide con la de esta cuenta." };
-  const sesion = { email: usuario.email, rol: usuario.rol };
-  await AsyncStorage.setItem(CLAVE_SESION, JSON.stringify(sesion));
-  avisar();
-  return { ok: true, sesion };
+  try {
+    const cred = await signInWithEmailAndPassword(auth, normalizar(email), password);
+    const sesion = await cargarSesion(cred.user);
+    avisar();
+    return { ok: true, sesion };
+  } catch (e) {
+    return { ok: false, ...traducirError(e) };
+  }
 };
 
-export const cerrarSesion = async () => { await AsyncStorage.removeItem(CLAVE_SESION); avisar(); };
-export const obtenerSesion = async () => JSON.parse((await AsyncStorage.getItem(CLAVE_SESION)) || "null");
+export const cerrarSesion = async () => {
+  await signOut(auth);
+  sesionActual = null;
+  avisar();
+};
+
+export const recuperarContrasena = async (email) => {
+  try {
+    await sendPasswordResetEmail(auth, normalizar(email));
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, ...traducirError(e) };
+  }
+};
+
+// Actualiza campos del perfil: { nombre, apellido, intereses }
+export const actualizarPerfil = async (cambios) => {
+  try {
+    if (!sesionActual) return { ok: false, mensaje: "No hay una sesión activa." };
+    await setDoc(doc(db, "usuarios", sesionActual.uid), cambios, { merge: true });
+    sesionActual = { ...sesionActual, ...cambios };
+    avisar();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, mensaje: "No se pudieron guardar los cambios." };
+  }
+};
+
+// Guarda los intereses elegidos (o una lista vacía si el usuario omite)
+export const guardarIntereses = (intereses) =>
+  actualizarPerfil({ intereses, interesesListo: true });

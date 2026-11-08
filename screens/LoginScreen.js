@@ -6,56 +6,92 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import {
   USUARIO_PRUEBA,
   registrarUsuario,
   iniciarSesionConCuenta,
+  recuperarContrasena,
 } from "../services/authService";
 
-export default function LoginScreen({ navigation }) {
+const REGEX_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export default function LoginScreen() {
+  const [modo, setModo] = useState("login"); // "login" | "registro"
+  const [nombre, setNombre] = useState("");
+  const [apellido, setApellido] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmar, setConfirmar] = useState("");
   const [error, setError] = useState("");
+  const [cargando, setCargando] = useState(false);
 
-  const validateForm = async () => {
-    if (!email || !password) {
-      setError("Todos los campos son obligatorios");
-    } else if (!email.includes("@")) {
-      setError("El correo debe tener un formato válido");
-    } else if (password.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres");
-    } else {
-      const resultado = await registrarUsuario(email, password);
-      if (!resultado.ok) {
-        setError(resultado.mensaje);
-        return;
-      }
-      setError("");
-      Alert.alert(
-        "Bienvenido a LimaGo",
-        "Tu cuenta ha sido creada exitosamente.",
-      );
-      navigation.replace("Intereses");
+  const esRegistro = modo === "registro";
+
+  const cambiarModo = () => {
+    setModo(esRegistro ? "login" : "registro");
+    setError("");
+  };
+
+  const validarRegistro = () => {
+    if (!nombre.trim() || !apellido.trim() || !email.trim() || !password || !confirmar) {
+      return "Todos los campos son obligatorios";
     }
+    if (!REGEX_EMAIL.test(email.trim())) return "El correo debe tener un formato válido";
+    if (password.length < 8) return "La contraseña debe tener al menos 8 caracteres";
+    if (!/\d/.test(password)) return "La contraseña debe incluir al menos un número";
+    if (password !== confirmar) return "Las contraseñas no coinciden";
+    return "";
+  };
+
+  const crearCuenta = async () => {
+    const mensaje = validarRegistro();
+    if (mensaje) {
+      setError(mensaje);
+      return;
+    }
+    setError("");
+    setCargando(true);
+    const resultado = await registrarUsuario({ nombre, apellido, email, password });
+    setCargando(false);
+    if (!resultado.ok) {
+      setError(resultado.mensaje);
+      return;
+    }
+    // App.js detecta la sesión y muestra la siguiente pantalla
+    Alert.alert("Bienvenido a LimaGo", "Tu cuenta ha sido creada exitosamente.");
   };
 
   const iniciarSesion = async () => {
-    if (!email || !password) {
-      Alert.alert(
-        "Campos incompletos",
-        "Ingresa tu correo y contraseña para iniciar sesión.",
-      );
-    } else if (!email.includes("@")) {
-      Alert.alert("Correo inválido", "Ingresa un correo con formato válido.");
+    if (!email.trim() || !password) {
+      setError("Ingresa tu correo y contraseña para iniciar sesión.");
+      return;
+    }
+    if (!REGEX_EMAIL.test(email.trim())) {
+      setError("Ingresa un correo con formato válido.");
+      return;
+    }
+    setError("");
+    setCargando(true);
+    const resultado = await iniciarSesionConCuenta(email, password);
+    setCargando(false);
+    if (!resultado.ok) {
+      Alert.alert(resultado.titulo, resultado.mensaje);
+    }
+  };
+
+  const olvideContrasena = async () => {
+    if (!REGEX_EMAIL.test(email.trim())) {
+      Alert.alert("Recuperar contraseña", "Escribe tu correo arriba y vuelve a pulsar este enlace.");
+      return;
+    }
+    const resultado = await recuperarContrasena(email);
+    if (resultado.ok) {
+      Alert.alert("Revisa tu correo", "Si la cuenta existe, te enviamos un enlace para crear una nueva contraseña.");
     } else {
-      const resultado = await iniciarSesionConCuenta(email, password);
-      if (!resultado.ok) {
-        Alert.alert(resultado.titulo, resultado.mensaje);
-        return;
-      }
-      setError("");
-      navigation.replace("Intereses");
+      Alert.alert(resultado.titulo, resultado.mensaje);
     }
   };
 
@@ -66,20 +102,47 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+    >
       <View style={styles.header}>
         <Text style={styles.logo}>LimaGo</Text>
-        <Text style={styles.subtitle}>
-          Descubre lo que está pasando en Lima
-        </Text>
+        <Text style={styles.subtitle}>Descubre lo que está pasando en Lima</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.title}>¡Únete a LimaGo!</Text>
+        <Text style={styles.title}>{esRegistro ? "¡Únete a LimaGo!" : "Bienvenido de vuelta"}</Text>
         <Text style={styles.description}>
-          Encuentra eventos, experiencias y actividades cerca de ti según tus
-          intereses.
+          {esRegistro
+            ? "Crea tu cuenta para encontrar eventos y publicar los tuyos."
+            : "Inicia sesión para ver los eventos que te interesan."}
         </Text>
+
+        {esRegistro && (
+          <>
+            <Text style={styles.label}>Nombre</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Tu nombre"
+              placeholderTextColor="#999"
+              autoCapitalize="words"
+              value={nombre}
+              onChangeText={setNombre}
+            />
+
+            <Text style={styles.label}>Apellido</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Tu apellido"
+              placeholderTextColor="#999"
+              autoCapitalize="words"
+              value={apellido}
+              onChangeText={setApellido}
+            />
+          </>
+        )}
 
         <Text style={styles.label}>Correo electrónico</Text>
         <TextInput
@@ -88,6 +151,7 @@ export default function LoginScreen({ navigation }) {
           placeholderTextColor="#999"
           keyboardType="email-address"
           autoCapitalize="none"
+          autoCorrect={false}
           value={email}
           onChangeText={setEmail}
         />
@@ -95,52 +159,74 @@ export default function LoginScreen({ navigation }) {
         <Text style={styles.label}>Contraseña</Text>
         <TextInput
           style={styles.input}
-          placeholder="Mínimo 6 caracteres"
+          placeholder={esRegistro ? "Mínimo 8 caracteres y un número" : "Tu contraseña"}
           placeholderTextColor="#999"
           secureTextEntry
+          autoCapitalize="none"
           value={password}
           onChangeText={setPassword}
         />
 
+        {esRegistro && (
+          <>
+            <Text style={styles.label}>Confirmar contraseña</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Repite tu contraseña"
+              placeholderTextColor="#999"
+              secureTextEntry
+              autoCapitalize="none"
+              value={confirmar}
+              onChangeText={setConfirmar}
+            />
+          </>
+        )}
+
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <TouchableOpacity
-          style={styles.button}
-          onPress={validateForm}
+          style={[styles.button, cargando && styles.buttonDisabled]}
+          onPress={esRegistro ? crearCuenta : iniciarSesion}
           activeOpacity={0.8}
+          disabled={cargando}
         >
-          <Text style={styles.buttonText}>Crear cuenta</Text>
+          {cargando ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.buttonText}>{esRegistro ? "Crear cuenta" : "Iniciar sesión"}</Text>
+          )}
         </TouchableOpacity>
+
+        {!esRegistro && (
+          <>
+            <TouchableOpacity onPress={olvideContrasena} activeOpacity={0.7}>
+              <Text style={styles.link}>¿Olvidaste tu contraseña?</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={usarCuentaDePrueba} activeOpacity={0.7}>
+              <Text style={styles.link}>Usar cuenta de prueba ({USUARIO_PRUEBA.email})</Text>
+            </TouchableOpacity>
+          </>
+        )}
 
         <View style={styles.separatorContainer}>
           <View style={styles.line} />
-          <Text style={styles.orText}>o</Text>
-          <View style={styles.line} />
         </View>
 
-        <TouchableOpacity
-          style={styles.loginButton}
-          onPress={iniciarSesion}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.loginButtonText}>Iniciar sesión</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={usarCuentaDePrueba} activeOpacity={0.7}>
-          <Text style={styles.testLink}>
-            Usar cuenta de prueba ({USUARIO_PRUEBA.email})
+        <TouchableOpacity onPress={cambiarModo} activeOpacity={0.7}>
+          <Text style={styles.toggleText}>
+            {esRegistro ? "¿Ya tienes cuenta? " : "¿No tienes cuenta? "}
+            <Text style={styles.toggleAccion}>{esRegistro ? "Inicia sesión" : "Crea una"}</Text>
           </Text>
         </TouchableOpacity>
-
-        <Text style={styles.footerText}>Eventos y experiencias en Lima</Text>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  scroll: { flex: 1, backgroundColor: "#F4F6FF" },
   container: {
-    flex: 1,
-    backgroundColor: "#F4F6FF",
+    flexGrow: 1,
     justifyContent: "center",
     padding: 20,
   },
@@ -186,12 +272,23 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderRadius: 10,
     marginTop: 5,
+    minHeight: 50,
+    justifyContent: "center",
   },
+  buttonDisabled: { backgroundColor: "#C7C0F0" },
   buttonText: {
     color: "#FFFFFF",
     textAlign: "center",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  error: { color: "#E53935", fontSize: 13, marginBottom: 10 },
+  link: {
+    textAlign: "center",
+    color: "#5B4BDB",
+    fontSize: 13,
+    fontWeight: "600",
+    marginTop: 16,
   },
   separatorContainer: {
     flexDirection: "row",
@@ -199,32 +296,6 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   },
   line: { flex: 1, height: 1, backgroundColor: "#E0E0E0" },
-  orText: { marginHorizontal: 12, color: "#999", fontSize: 14 },
-  loginButton: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 2,
-    borderColor: "#5B4BDB",
-    paddingVertical: 13,
-    borderRadius: 10,
-  },
-  loginButtonText: {
-    color: "#5B4BDB",
-    textAlign: "center",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  error: { color: "#E53935", fontSize: 13, marginBottom: 10 },
-  footerText: {
-    textAlign: "center",
-    color: "#888",
-    fontSize: 12,
-    marginTop: 20,
-  },
-  testLink: {
-    textAlign: "center",
-    color: "#5B4BDB",
-    fontSize: 13,
-    fontWeight: "600",
-    marginTop: 16,
-  },
+  toggleText: { textAlign: "center", color: "#666", fontSize: 14 },
+  toggleAccion: { color: "#5B4BDB", fontWeight: "700" },
 });

@@ -38,12 +38,15 @@ export default function PestanasPrincipales({ sesion }) {
       <Pestanas.Screen name="Eventos" options={{ tabBarIcon: ({ color, size }) => <MaterialIcons name="calendar-month" color={color} size={size} /> }}>
         {(props) => <CatalogScreen {...props} sesion={sesion} />}
       </Pestanas.Screen>
+
       <Pestanas.Screen name="Publicar" options={{ tabBarIcon: ({ color, size }) => <MaterialIcons name="add-circle-outline" color={color} size={size} /> }}>
         {(props) => <PublicarScreen {...props} sesion={sesion} />}
       </Pestanas.Screen>
+
       {sesion?.rol === "usuario" ? <Pestanas.Screen name="Mis publicaciones" options={{ tabBarIcon: ({ color, size }) => <MaterialIcons name="article" color={color} size={size} /> }}>
         {(props) => <MisPublicacionesScreen {...props} sesion={sesion} />}
       </Pestanas.Screen> : null}
+      
       {sesion?.rol === "administrador" ? <Pestanas.Screen name="Solicitudes" options={{ tabBarBadge: pendientes.length || undefined, tabBarIcon: ({ color, size }) => <MaterialIcons name="fact-check" color={color} size={size} /> }}>
         {(props) => <SolicitudesScreen {...props} sesion={sesion} />}
       </Pestanas.Screen> : null}

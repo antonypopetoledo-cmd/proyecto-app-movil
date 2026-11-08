@@ -5,25 +5,15 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
+import { guardarIntereses } from '../services/authService';
+import { INTERESES } from '../data/categorias';
 
-const INTERESES = [
-  { id: 'kpop', label: '💃 K-pop / Danza' },
-  { id: 'conciertos', label: '🎵 Conciertos' },
-  { id: 'teatro', label: '🎭 Teatro' },
-  { id: 'arte', label: '🎨 Arte y Cultura' },
-  { id: 'tecnologia', label: '💻 Tecnología' },
-  { id: 'gaming', label: '🎮 Gaming' },
-  { id: 'anime', label: '🍥 Anime' },
-  { id: 'emprendimiento', label: '🧑‍💼 Emprendimiento' },
-  { id: 'universitarios', label: '🎓 Eventos universitarios' },
-  { id: 'gastronomia', label: '🍔 Ferias gastronómicas' },
-  { id: 'deportes', label: '⚽ Deportes' },
-  { id: 'festivales', label: '🎉 Festivales' },
-];
-
-export default function InterestsScreen({ navigation }) {
+export default function InterestsScreen() {
   const [seleccionados, setSeleccionados] = useState([]);
+  const [guardando, setGuardando] = useState(false);
 
   const toggleInteres = (id) => {
     setSeleccionados((prev) =>
@@ -31,11 +21,14 @@ export default function InterestsScreen({ navigation }) {
     );
   };
 
-  const continuar = () => {
-    navigation.replace('Principal', {
-      screen: 'Eventos',
-      params: { intereses: seleccionados },
-    });
+  // Al guardar, App.js detecta el cambio en la sesión y pasa a la pantalla principal
+  const guardar = async (lista) => {
+    setGuardando(true);
+    const resultado = await guardarIntereses(lista);
+    if (!resultado.ok) {
+      setGuardando(false);
+      Alert.alert('No se pudo guardar', resultado.mensaje);
+    }
   };
 
   return (
@@ -70,14 +63,18 @@ export default function InterestsScreen({ navigation }) {
           {seleccionados.length} seleccionado{seleccionados.length !== 1 ? 's' : ''}
         </Text>
         <TouchableOpacity
-          style={[styles.button, seleccionados.length === 0 && styles.buttonDisabled]}
-          onPress={continuar}
+          style={[styles.button, (seleccionados.length === 0 || guardando) && styles.buttonDisabled]}
+          onPress={() => guardar(seleccionados)}
           activeOpacity={0.8}
-          disabled={seleccionados.length === 0}
+          disabled={seleccionados.length === 0 || guardando}
         >
-          <Text style={styles.buttonText}>Continuar</Text>
+          {guardando ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.buttonText}>Continuar</Text>
+          )}
         </TouchableOpacity>
-        <TouchableOpacity onPress={continuar}>
+        <TouchableOpacity onPress={() => guardar([])} disabled={guardando}>
           <Text style={styles.skip}>Omitir por ahora</Text>
         </TouchableOpacity>
       </View>
@@ -122,6 +119,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#5B4BDB',
     paddingVertical: 15,
     borderRadius: 10,
+    minHeight: 50,
+    justifyContent: 'center',
   },
   buttonDisabled: { backgroundColor: '#C7C0F0' },
   buttonText: { color: '#FFF', textAlign: 'center', fontSize: 16, fontWeight: 'bold' },
