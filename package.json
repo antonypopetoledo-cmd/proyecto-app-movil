@@ -24,7 +24,12 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "importar:eventos": "node scripts/importarEventos.mjs",
+    "test": "node --test tests/estadisticas.test.mjs"
   },
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "firebase-admin": "^14.5.0"
+  }
 }

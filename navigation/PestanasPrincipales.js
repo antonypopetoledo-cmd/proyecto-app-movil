@@ -5,6 +5,7 @@ import CatalogScreen from '../screens/CatalogScreen';
 import PublicarScreen from '../screens/PublicarScreen';
 import SolicitudesScreen from '../screens/SolicitudesScreen';
 import MisPublicacionesScreen from '../screens/MisPublicacionesScreen';
+import EstadisticasScreen from '../screens/EstadisticasScreen';
 import useSolicitudes from '../hooks/useSolicitudes';
 
 const Pestanas = createBottomTabNavigator();
@@ -49,6 +50,9 @@ export default function PestanasPrincipales({ sesion }) {
       
       {sesion?.rol === "administrador" ? <Pestanas.Screen name="Solicitudes" options={{ tabBarBadge: pendientes.length || undefined, tabBarIcon: ({ color, size }) => <MaterialIcons name="fact-check" color={color} size={size} /> }}>
         {(props) => <SolicitudesScreen {...props} sesion={sesion} />}
+      </Pestanas.Screen> : null}
+      {sesion?.rol === "administrador" ? <Pestanas.Screen name="Estadísticas" options={{ tabBarIcon: ({ color, size }) => <MaterialIcons name="bar-chart" color={color} size={size} /> }}>
+        {(props) => <EstadisticasScreen {...props} sesion={sesion} />}
       </Pestanas.Screen> : null}
     </Pestanas.Navigator>
   );
