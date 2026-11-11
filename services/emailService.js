@@ -1,8 +1,8 @@
 import { send, EmailJSResponseStatus } from "@emailjs/react-native";
 
 const EMAILJS = {
-  serviceId: "service_5zyri0f",
-  templateId: "template_mwl4t2g",
+  serviceId: "service_ecypchi",
+  templateId: "template_q8x643o",
   publicKey: "hbZJOaPQk7nVd99m2",
 };
 
