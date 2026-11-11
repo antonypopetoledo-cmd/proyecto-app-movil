@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Alert, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import LoginScreen from './screens/LoginScreen';
@@ -9,7 +9,7 @@ import PestanasPrincipales from './navigation/PestanasPrincipales';
 import EditarEventoScreen from './screens/EditarEventoScreen';
 import EditarSolicitudScreen from './screens/EditarSolicitudScreen';
 import { inicializarAuth, suscribirSesion, obtenerSesion } from './services/authService';
-import { inicializarSolicitudes } from './services/solicitudesService';
+import { migrarDatosLocales } from './services/migracionLocalService';
 
 const Stack = createNativeStackNavigator();
 
@@ -19,14 +19,26 @@ export default function App() {
 
   useEffect(() => {
     let activo = true;
-    Promise.all([inicializarAuth(), inicializarSolicitudes()])
-      .then(([sesionInicial]) => { if (activo) setSesion(sesionInicial); })
+    inicializarAuth()
+      .then(async (sesionInicial) => {
+        if (sesionInicial) {
+          try { await migrarDatosLocales(sesionInicial); }
+          catch (e) { Alert.alert("Migración pendiente", e.message); }
+        }
+        if (activo) setSesion(sesionInicial);
+      })
       .catch((e) => console.log("Error al iniciar:", e.message))
       .finally(() => { if (activo) setCargado(true); });
 
-    const desuscribir = suscribirSesion(() =>
-      obtenerSesion().then((s) => { if (activo) setSesion(s); })
-    );
+    const desuscribir = suscribirSesion(() => {
+      obtenerSesion().then(async (s) => {
+        if (s) {
+          try { await migrarDatosLocales(s); }
+          catch (e) { Alert.alert("Migración pendiente", e.message); }
+        }
+        if (activo) setSesion(s);
+      });
+    });
     return () => { activo = false; desuscribir && desuscribir(); };
   }, []);
 

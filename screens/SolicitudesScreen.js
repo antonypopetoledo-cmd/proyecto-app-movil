@@ -8,6 +8,7 @@ import {
   Alert,
   Modal,
   TextInput,
+  ActivityIndicator,
 } from "react-native";
 import useSolicitudes from "../hooks/useSolicitudes";
 
@@ -51,16 +52,24 @@ function SolicitudCard({ solicitud, onAceptar, onEliminar, onVerDetalle }) {
 }
 
 export default function SolicitudesScreen({ sesion, navigation }) {
-  const { pendientes, aceptarSolicitud, rechazarSolicitud } = useSolicitudes(sesion);
+  const { pendientes, aceptarSolicitud, rechazarSolicitud, loading, error, reintentar } = useSolicitudes(sesion);
   const [solicitudRechazo, setSolicitudRechazo] = React.useState(null);
   const [motivo, setMotivo] = React.useState("");
+  const [guardando, setGuardando] = React.useState(false);
 
-  const aceptar = (solicitud) => {
-    aceptarSolicitud(solicitud.id);
-    Alert.alert(
-      "Solicitud aceptada",
-      `"${solicitud.titulo}" ya aparece en la pestaña Eventos.`
-    );
+  const aceptar = async (solicitud) => {
+    if (guardando) return;
+    setGuardando(true);
+    try {
+      const resultado = await aceptarSolicitud(solicitud.id);
+      Alert.alert(resultado ? "Solicitud aceptada" : "Solicitud no disponible", resultado
+        ? `"${solicitud.titulo}" ya aparece en la pestaña Eventos.`
+        : "La solicitud ya fue procesada.");
+    } catch (e) {
+      Alert.alert("Error", "No se pudo aprobar la solicitud.");
+    } finally {
+      setGuardando(false);
+    }
   };
 
   const eliminar = (solicitud) => {
@@ -77,7 +86,9 @@ export default function SolicitudesScreen({ sesion, navigation }) {
         </Text>
       </View>
 
-      <FlatList
+      {loading ? <ActivityIndicator color="#5B4BDB" style={{ marginTop: 30 }} /> : null}
+      {error ? <TouchableOpacity onPress={reintentar}><Text style={estilos.vacio}>{error} Toca para reintentar.</Text></TouchableOpacity> : null}
+      {!loading && !error ? <FlatList
         data={pendientes}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
@@ -92,7 +103,7 @@ export default function SolicitudesScreen({ sesion, navigation }) {
         ListEmptyComponent={
           <Text style={estilos.vacio}>No hay solicitudes pendientes</Text>
         }
-      />
+      /> : null}
       <Modal visible={!!solicitudRechazo} transparent animationType="fade">
         <View style={estilos.modalFondo}><View style={estilos.modal}>
           <Text style={estilos.modalTitulo}>Motivo del rechazo</Text>
@@ -100,7 +111,16 @@ export default function SolicitudesScreen({ sesion, navigation }) {
           <TextInput style={estilos.modalInput} value={motivo} onChangeText={setMotivo} multiline placeholder="Escribe el motivo" />
           <View style={estilos.modalAcciones}>
             <TouchableOpacity style={estilos.modalCancelar} onPress={() => setSolicitudRechazo(null)}><Text style={estilos.modalCancelarTexto}>Cancelar</Text></TouchableOpacity>
-            <TouchableOpacity style={estilos.modalRechazar} onPress={async () => { if (!motivo.trim()) return Alert.alert("Motivo obligatorio", "Escribe un motivo."); const resultado = await rechazarSolicitud(solicitudRechazo.id, motivo); if (resultado !== false) { setSolicitudRechazo(null); Alert.alert("Solicitud rechazada", "El usuario podrá ver el motivo y corregir su publicación."); } }}><Text style={estilos.modalRechazarTexto}>Confirmar rechazo</Text></TouchableOpacity>
+            <TouchableOpacity style={estilos.modalRechazar} disabled={guardando} onPress={async () => {
+              if (!motivo.trim()) return Alert.alert("Motivo obligatorio", "Escribe un motivo.");
+              setGuardando(true);
+              try {
+                const resultado = await rechazarSolicitud(solicitudRechazo.id, motivo);
+                if (resultado) { setSolicitudRechazo(null); Alert.alert("Solicitud rechazada", "El usuario podrá ver el motivo y corregir su publicación."); }
+                else Alert.alert("Solicitud no disponible", "La solicitud ya fue procesada.");
+              } catch (e) { Alert.alert("Error", "No se pudo rechazar la solicitud."); }
+              finally { setGuardando(false); }
+            }}><Text style={estilos.modalRechazarTexto}>{guardando ? "Guardando..." : "Confirmar rechazo"}</Text></TouchableOpacity>
           </View>
         </View></View>
       </Modal>

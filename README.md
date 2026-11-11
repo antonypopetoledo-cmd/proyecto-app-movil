@@ -23,7 +23,7 @@ Implementar la base funcional de la aplicación aplicando:
 
 ## Prototipo de diseño
 
-Figma: _[PEGAR AQUÍ EL ENLACE]_
+Figma: [https://www.figma.com/design/i8R0n1Ib4vVBKbJTFnSGT1/LimaGo?node-id=0-1&t=jaunEBU5tWa8YnDn-1]
 
 ## Tecnologías
 

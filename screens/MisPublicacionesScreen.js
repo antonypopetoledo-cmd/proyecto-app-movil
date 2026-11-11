@@ -1,9 +1,9 @@
 import React from "react";
-import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import useSolicitudes from "../hooks/useSolicitudes";
 
 export default function MisPublicacionesScreen({ sesion, navigation }) {
-  const { pendientes, aprobados, rechazados, eliminarSolicitud } = useSolicitudes(sesion);
+  const { pendientes, aprobados, rechazados, eliminarSolicitud, loading, error, reintentar } = useSolicitudes(sesion);
   const propias = [...pendientes, ...aprobados, ...rechazados]
     .filter((item) => item.creador === sesion?.email)
     .filter((item, index, lista) => lista.findIndex((otro) => otro.id === item.id) === index);
@@ -17,7 +17,9 @@ export default function MisPublicacionesScreen({ sesion, navigation }) {
         <Text style={estilos.headerSubtitle}>Revisa el estado de tus eventos enviados</Text>
       </View>
 
-      <FlatList 
+      {loading ? <ActivityIndicator style={{ marginTop: 20 }} color="#5B4BDB" /> : null}
+      {error ? <TouchableOpacity onPress={reintentar}><Text style={{ textAlign: "center", marginTop: 20 }}>{error} Toca para reintentar.</Text></TouchableOpacity> : null}
+      {!loading && !error ? <FlatList
         style={estilos.lista} 
         contentContainerStyle={{ flexGrow: 1, paddingBottom: 30 }} 
         data={propias} 
@@ -47,11 +49,11 @@ export default function MisPublicacionesScreen({ sesion, navigation }) {
             <Text style={item.estado === "rechazado" ? estilos.rechazado : estilos.estado}>{estado(item)}</Text>
             {item.motivoRechazo ? <Text style={estilos.motivo}>Motivo: {item.motivoRechazo}</Text> : null}
             {item.estado === "rechazado" ? <TouchableOpacity onPress={() => navigation.navigate("EditarSolicitud", { solicitud: item })}><Text style={estilos.enlace}>Editar y reenviar</Text></TouchableOpacity> : null}
-            {item.estado === "pendiente" ? <TouchableOpacity onPress={() => Alert.alert("Cancelar solicitud", "¿Cancelar esta solicitud?", [{ text: "No" }, { text: "Cancelar", style: "destructive", onPress: () => eliminarSolicitud(item.id) }])}><Text style={estilos.rechazado}>Cancelar solicitud</Text></TouchableOpacity> : null}
+             {item.estado === "pendiente" ? <TouchableOpacity onPress={() => Alert.alert("Cancelar solicitud", "¿Cancelar esta solicitud?", [{ text: "No" }, { text: "Cancelar", style: "destructive", onPress: async () => { try { await eliminarSolicitud(item.id); } catch (e) { Alert.alert("Error", "No se pudo cancelar la solicitud."); } } }])}><Text style={estilos.rechazado}>Cancelar solicitud</Text></TouchableOpacity> : null}
             {item.estado === "aprobado" ? <TouchableOpacity onPress={() => navigation.navigate("DetalleEvento", { evento: item })}><Text style={estilos.enlace}>Ver detalles</Text></TouchableOpacity> : null}
           </View>
         )} 
-      />
+      /> : null}
     </View>
   );
 }

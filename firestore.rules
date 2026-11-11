@@ -1,0 +1,66 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function administrador() {
+      return autenticado() &&
+        exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'administrador';
+    }
+
+    match /usuarios/{uid} {
+      allow read: if administrador() || (autenticado() && request.auth.uid == uid);
+      allow create: if autenticado() && request.auth.uid == uid && request.resource.data.rol == 'usuario';
+      allow update: if autenticado() && request.auth.uid == uid &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rol', 'correo']);
+      allow delete: if false;
+
+      match /favoritos/{eventoId} {
+        allow read: if autenticado() && request.auth.uid == uid;
+        allow create: if autenticado() && request.auth.uid == uid &&
+          exists(/databases/$(database)/documents/eventos/$(eventoId)) &&
+          request.resource.data.eventoId == eventoId;
+        allow delete: if autenticado() && request.auth.uid == uid;
+        allow update: if false;
+      }
+    }
+
+    match /eventos/{eventoId} {
+      allow read: if autenticado();
+      allow write: if administrador();
+
+      match /asistencias/{uid} {
+        allow read: if administrador() || (autenticado() && request.auth.uid == uid);
+        allow create: if autenticado() && request.auth.uid == uid &&
+          exists(/databases/$(database)/documents/eventos/$(eventoId)) &&
+          request.resource.data.uid == uid && request.resource.data.eventoId == eventoId;
+        allow update, delete: if false;
+      }
+    }
+
+    match /solicitudes/{solicitudId} {
+      allow read: if administrador() ||
+        (autenticado() && resource.data.creadorUid == request.auth.uid);
+      allow create: if administrador() || (autenticado() &&
+        request.resource.data.creadorUid == request.auth.uid &&
+        request.resource.data.creador == request.auth.token.email &&
+        request.resource.data.estado == 'pendiente');
+      allow update: if administrador() || (autenticado() &&
+        resource.data.creadorUid == request.auth.uid &&
+        resource.data.estado == 'rechazado' &&
+        request.resource.data.estado == 'pendiente' &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['creador', 'creadorUid', 'creadoEn']));
+      allow delete: if administrador() || (autenticado() &&
+        resource.data.creadorUid == request.auth.uid && resource.data.estado == 'pendiente');
+    }
+
+    match /importaciones/{id} {
+      allow read: if administrador();
+      allow create: if administrador();
+      allow update, delete: if false;
+    }
+  }
+}

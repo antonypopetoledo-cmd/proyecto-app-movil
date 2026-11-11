@@ -9,10 +9,12 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
+  Alert,
 } from "react-native";
 import { Image } from "expo-image";
 import { useRoute } from "@react-navigation/native"; // Importante para leer los parámetros pasados
 import useEventos from "../hooks/useEventos";
+import useFavoritos from "../hooks/useFavoritos";
 import { cerrarSesion as cerrarSesionUsuario } from "../services/authService";
 
 // Diccionario para traducir los IDs seleccionados a los textos de tus categorías reales
@@ -83,7 +85,7 @@ export default function CatalogScreen({ navigation, sesion }) {
 
   const [busqueda, setBusqueda] = useState("");
   const [categoria, setCategoria] = useState("Todos");
-  const [favoritos, setFavoritos] = useState([]);
+  const { favoritos, cargandoFavoritos, errorFavoritos, alternarFavorito, reintentarFavoritos } = useFavoritos(sesion?.uid);
   const [soloFavoritos, setSoloFavoritos] = useState(false);
 
   const cerrarSesion = async () => {
@@ -94,10 +96,12 @@ export default function CatalogScreen({ navigation, sesion }) {
   }
 };
 
-  const toggleFavorito = (id) => {
-    setFavoritos((prev) =>
-      prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id],
-    );
+  const toggleFavorito = async (id) => {
+    try {
+      await alternarFavorito(id);
+    } catch (e) {
+      Alert.alert("Favoritos", "No se pudo guardar el favorito. Intenta nuevamente.");
+    }
   };
 
   const categorias = useMemo(
@@ -155,7 +159,7 @@ export default function CatalogScreen({ navigation, sesion }) {
   ]);
 
   const renderContenido = () => {
-    if (loading) {
+    if (loading || cargandoFavoritos) {
       return (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#5B4BDB" />
@@ -217,6 +221,7 @@ export default function CatalogScreen({ navigation, sesion }) {
       </View>
 
       <View style={styles.filtros}>
+        {errorFavoritos ? <TouchableOpacity onPress={reintentarFavoritos}><Text style={styles.mensaje}>{errorFavoritos} Toca para reintentar.</Text></TouchableOpacity> : null}
         <TextInput
           style={styles.input}
           placeholder="Buscar por nombre o lugar..."

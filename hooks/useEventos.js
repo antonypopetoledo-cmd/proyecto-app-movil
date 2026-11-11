@@ -1,43 +1,34 @@
-import { useState, useEffect, useMemo } from "react";
-import { getEventos, suscribirEventos, getEliminados, aplicarCambiosLocales } from "../services/eventosService";
-import useSolicitudes from "./useSolicitudes";
+import { useCallback, useEffect, useState } from "react";
+import { getEventos, suscribirEventos } from "../services/eventosService";
 
 export default function useEventos(sesion) {
-  const [eventosBase, setEventos] = useState([]);
-  // Los eventos aceptados desde las solicitudes se muestran junto a los demás.
-  const { aprobados } = useSolicitudes(sesion);
-  const eventos = useMemo(() => eventosBase, [eventosBase]);
+  const [eventos, setEventos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [intento, setIntento] = useState(0);
 
-  const cargar = async (esRefresh = false) => {
+  const recargar = useCallback(async () => {
+    setRefreshing(true);
     try {
-      esRefresh ? setRefreshing(true) : setLoading(true);
+      setEventos(await getEventos());
       setError(null);
-      const data = await getEventos();
-      const eliminados = await getEliminados();
-      const aprobadosLocales = await Promise.all(aprobados.map(aplicarCambiosLocales));
-      setEventos([...aprobadosLocales, ...data].filter((evento) => !eliminados.includes(String(evento.id))));
     } catch (e) {
-      setError(e.message || "No se pudieron cargar los eventos");
+      setError("No se pudieron cargar los eventos. Revisa tu conexión.");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    cargar();
-    return suscribirEventos(() => cargar(true));
-  }, [aprobados]);
+    setLoading(true);
+    setEventos([]);
+    return suscribirEventos(
+      (lista) => { setEventos(lista); setError(null); setLoading(false); },
+      () => { setError("No se pudieron cargar los eventos. Revisa tu conexión."); setLoading(false); },
+    );
+  }, [sesion?.uid, intento]);
 
-  return {
-    eventos,
-    loading,
-    refreshing,
-    error,
-    recargar: () => cargar(true),
-    reintentar: () => cargar(false),
-  };
+  return { eventos, loading, refreshing, error, recargar, reintentar: () => setIntento((actual) => actual + 1) };
 }

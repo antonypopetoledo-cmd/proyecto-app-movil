@@ -13,6 +13,7 @@ import {
 import DateTimePicker from "@react-native-community/datetimepicker";
 import useSolicitudes from "../hooks/useSolicitudes";
 import { INTERESES } from "../data/categorias";
+import { crearFechaInicio, formatearFecha, formatearHora } from "../utils/fechaEvento";
 
 const CAMPOS_VACIOS = {
   titulo: "",
@@ -28,18 +29,15 @@ const CAMPOS_VACIOS = {
   descripcion: "",
 };
 
-// Fecha real en el mismo formato que eventos.json: 2026-11-20T12:00:00
-const aFechaISO = (f) => {
-  const dos = (n) => String(n).padStart(2, "0");
-  return `${f.getFullYear()}-${dos(f.getMonth() + 1)}-${dos(f.getDate())}T12:00:00`;
-};
-
 export default function PublicarScreen({ sesion, navigation }) {
   const { enviarSolicitud } = useSolicitudes(sesion);
   const [form, setForm] = useState(CAMPOS_VACIOS);
   const [error, setError] = useState("");
   const [mostrarCalendario, setMostrarCalendario] = useState(false);
+  const [mostrarReloj, setMostrarReloj] = useState(false);
   const [fechaCalendario, setFechaCalendario] = useState(new Date());
+  const [horaCalendario, setHoraCalendario] = useState(new Date());
+  const [enviando, setEnviando] = useState(false);
 
   const esAdmin = sesion?.rol === "administrador";
 
@@ -50,10 +48,11 @@ export default function PublicarScreen({ sesion, navigation }) {
     if (
       !form.titulo.trim() ||
       !form.categoria.trim() ||
-      !form.fecha.trim() ||
+       !form.fecha.trim() ||
+       !form.hora.trim() ||
       !form.lugar.trim()
     ) {
-      setError("Nombre, categoría, fecha y lugar son obligatorios.");
+      setError("Nombre, categoría, fecha, hora y lugar son obligatorios.");
       return;
     }
     if (form.enlace.trim() && !/^https?:\/\//i.test(form.enlace.trim())) {
@@ -66,14 +65,22 @@ export default function PublicarScreen({ sesion, navigation }) {
     }
 
     setError("");
-    await enviarSolicitud(form);
-    setForm(CAMPOS_VACIOS);
-    Alert.alert(
-      esAdmin ? "Evento publicado" : "Solicitud enviada",
-      esAdmin
-        ? "Tu evento ya aparece en la pestaña Eventos."
-        : "Tu evento quedó pendiente de revisión. Si es aceptado, aparecerá en la pestaña Eventos."
-    );
+    if (enviando) return;
+    setEnviando(true);
+    try {
+      await enviarSolicitud(form);
+      setForm(CAMPOS_VACIOS);
+      Alert.alert(
+        esAdmin ? "Evento publicado" : "Solicitud enviada",
+        esAdmin
+          ? "Tu evento ya aparece en la pestaña Eventos."
+          : "Tu evento quedó pendiente de revisión. Si es aceptado, aparecerá en la pestaña Eventos."
+      );
+    } catch (e) {
+      setError("No se pudo enviar la solicitud. Revisa tu conexión e inténtalo otra vez.");
+    } finally {
+      setEnviando(false);
+    }
   };
 
   const campo = (etiqueta, clave, opciones = {}) => (
@@ -147,8 +154,8 @@ export default function PublicarScreen({ sesion, navigation }) {
                 setFechaCalendario(fecha);
                 setForm((prev) => ({
                   ...prev,
-                  fecha: fecha.toLocaleDateString("es-PE"),
-                  fechaInicio: aFechaISO(fecha),
+                   fecha: formatearFecha(fecha),
+                   fechaInicio: crearFechaInicio(fecha, horaCalendario),
                 }));
                 setMostrarCalendario(false);
               }}
@@ -156,7 +163,30 @@ export default function PublicarScreen({ sesion, navigation }) {
             />
           ) : null}
         </>
-        {campo("Hora", "hora", { placeholder: "Ej. 8:00 p. m." })}
+        <>
+          <Text style={estilos.label}>Hora *</Text>
+          <TouchableOpacity style={estilos.input} onPress={() => setMostrarReloj(true)}>
+            <Text>{form.hora || "Seleccionar hora"}</Text>
+          </TouchableOpacity>
+          {mostrarReloj ? (
+            <DateTimePicker
+              value={horaCalendario}
+              mode="time"
+              display="clock"
+              onValueChange={(evento, hora) => {
+                if (!hora) return;
+                setHoraCalendario(hora);
+                setForm((prev) => ({
+                  ...prev,
+                  hora: formatearHora(hora),
+                  fechaInicio: crearFechaInicio(fechaCalendario, hora),
+                }));
+                setMostrarReloj(false);
+              }}
+              onDismiss={() => setMostrarReloj(false)}
+            />
+          ) : null}
+        </>
         {campo("Lugar *", "lugar", {
           placeholder: "Ej. Costa 21, San Miguel",
         })}
@@ -185,9 +215,10 @@ export default function PublicarScreen({ sesion, navigation }) {
           style={estilos.boton}
           onPress={enviar}
           activeOpacity={0.8}
+          disabled={enviando}
         >
           <Text style={estilos.botonTexto}>
-            {esAdmin ? "Publicar evento" : "Enviar solicitud"}
+            {enviando ? "Guardando..." : esAdmin ? "Publicar evento" : "Enviar solicitud"}
           </Text>
         </TouchableOpacity>
       </ScrollView>
