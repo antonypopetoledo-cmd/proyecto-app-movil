@@ -7,6 +7,7 @@ import SolicitudesScreen from '../screens/SolicitudesScreen';
 import MisPublicacionesScreen from '../screens/MisPublicacionesScreen';
 import EstadisticasScreen from '../screens/EstadisticasScreen';
 import useSolicitudes from '../hooks/useSolicitudes';
+import PerfilScreen from '../screens/PerfilScreen';
 
 const Pestanas = createBottomTabNavigator();
 
@@ -14,7 +15,7 @@ export default function PestanasPrincipales({ sesion }) {
   const { pendientes } = useSolicitudes(sesion);
 
   return (
-        <Pestanas.Navigator
+    <Pestanas.Navigator
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#5B4BDB',
@@ -40,6 +41,10 @@ export default function PestanasPrincipales({ sesion }) {
         {(props) => <CatalogScreen {...props} sesion={sesion} />}
       </Pestanas.Screen>
 
+      <Pestanas.Screen name="Perfil" options={{ tabBarIcon: ({ color, size }) => <MaterialIcons name="person" color={color} size={size} /> }}>
+        {(props) => <PerfilScreen {...props} sesion={sesion} />}
+      </Pestanas.Screen>
+
       <Pestanas.Screen name="Publicar" options={{ tabBarIcon: ({ color, size }) => <MaterialIcons name="add-circle-outline" color={color} size={size} /> }}>
         {(props) => <PublicarScreen {...props} sesion={sesion} />}
       </Pestanas.Screen>
@@ -47,7 +52,7 @@ export default function PestanasPrincipales({ sesion }) {
       {sesion?.rol === "usuario" ? <Pestanas.Screen name="Mis publicaciones" options={{ tabBarIcon: ({ color, size }) => <MaterialIcons name="article" color={color} size={size} /> }}>
         {(props) => <MisPublicacionesScreen {...props} sesion={sesion} />}
       </Pestanas.Screen> : null}
-      
+
       {sesion?.rol === "administrador" ? <Pestanas.Screen name="Solicitudes" options={{ tabBarBadge: pendientes.length || undefined, tabBarIcon: ({ color, size }) => <MaterialIcons name="fact-check" color={color} size={size} /> }}>
         {(props) => <SolicitudesScreen {...props} sesion={sesion} />}
       </Pestanas.Screen> : null}

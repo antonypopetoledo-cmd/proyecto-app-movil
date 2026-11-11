@@ -44,6 +44,7 @@ cd proyecto-app-movil
 # 2. Instalar dependencias
 npm install
 npx expo install @expo/vector-icons
+npm install @emailjs/react-native
 
 # 3. Iniciar el proyecto
 npx expo start
@@ -73,10 +74,13 @@ También puedes crear una cuenta nueva desde la pantalla de inicio (se registra 
 ## Flujo de la aplicación
 
 ```
-Login → Intereses → Pestañas principales ──► Detalle del evento
+Login → Intereses → Pestañas principales ──► Detalle del evento (Asistiré → correo)
                     ├─ Eventos
                     ├─ Publicar
-                    └─ Solicitudes (solo administrador)
+                    ├─ Mis publicaciones (usuario)
+                    ├─ Solicitudes (solo administrador)
+                    ├─ Estadísticas (solo administrador)
+                    └─ Perfil
 ```
 
 ## Estructura del proyecto
@@ -84,11 +88,14 @@ Login → Intereses → Pestañas principales ──► Detalle del evento
 ```
 proyecto-app-movil/
 ├── assets/         # iconos e imágenes
-├── data/           # eventos.json (datos locales)
-├── hooks/          # useEventos, useSolicitudes
+├── data/           # eventos.json (datos locales) y categorías
+├── docs/           # documentación de persistencia (Firestore)
+├── hooks/          # useEventos, useSolicitudes, useFavoritos
 ├── navigation/     # pestañas principales
-├── screens/        # pantallas de la app
-├── services/       # auth, eventos y solicitudes
+├── screens/        # pantallas de la app (incluye PerfilScreen)
+├── scripts/        # importación inicial del catálogo a Firestore
+├── services/       # auth, eventos, solicitudes, favoritos, asistencias y correo (EmailJS)
+├── firestore.rules # reglas de seguridad de Firestore
 ├── App.js          # navegación principal (Stack)
 └── app.json        # configuración de Expo
 ```
