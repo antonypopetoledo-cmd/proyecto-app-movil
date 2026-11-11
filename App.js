@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { enviarCorreoConfirmacion } from './services/emailService';
 import LoginScreen from './screens/LoginScreen';
 import InterestsScreen from './screens/InterestsScreen';
 import DetalleEventoScreen from './screens/DetalleEventoScreen';

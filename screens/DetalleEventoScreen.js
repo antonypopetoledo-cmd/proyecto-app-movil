@@ -12,6 +12,8 @@ import { Image } from "expo-image";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { eliminarEvento } from "../services/eventosService";
+import { registrarAsistencia } from "../services/asistenciasService";
+import { enviarCorreoConfirmacion } from "../services/emailService";
 
 // Fila con icono + etiqueta y su valor debajo
 const Dato = ({ icono, etiqueta, children }) => (
@@ -28,10 +30,43 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
   const { evento } = route.params;
   const esSolicitud = route.params.esSolicitud === true;
   const [recordatorio, setRecordatorio] = useState(false);
+  const [asistire, setAsistire] = useState(false);
+  const [procesando, setProcesando] = useState(false);
   const insets = useSafeAreaInsets();
 
   const esAdmin = sesion?.rol === "administrador";
   const puedeGestionar = esAdmin && !esSolicitud;
+  // "Asistiré" solo para usuarios y solo en eventos ya publicados (no en solicitudes pendientes)
+  const puedeAsistir = !esAdmin && !esSolicitud;
+
+  // registrarAsistencia (Firestore) devuelve true si creó la asistencia y false si ya existía.
+  // El correo se envía solo en el primer registro.
+  const confirmarAsistencia = async () => {
+    if (procesando || asistire) return;
+    setProcesando(true);
+    try {
+      const creada = await registrarAsistencia(sesion.uid, evento.id);
+      setAsistire(true);
+      if (!creada) {
+        Alert.alert(
+          "Ya estabas registrado",
+          "Ya habías confirmado tu asistencia a este evento.",
+        );
+        return;
+      }
+      const correo = await enviarCorreoConfirmacion({ sesion, evento });
+      Alert.alert(
+        "¡Asistencia confirmada!",
+        correo.ok
+          ? `Te enviamos un correo de confirmación a ${sesion.email}.`
+          : "Quedaste registrado, pero no pudimos enviar el correo de confirmación.",
+      );
+    } catch (e) {
+      Alert.alert("No se pudo confirmar", e?.message || "Inténtalo de nuevo.");
+    } finally {
+      setProcesando(false);
+    }
+  };
 
   const toggleRecordatorio = () => {
     setRecordatorio(!recordatorio);
@@ -152,19 +187,46 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
 
       {/* Botones fijos abajo */}
       <View style={[styles.pie, { paddingBottom: insets.bottom + 12 }]}>
-        {/* Acción principal para quien asiste. Aquí irá el botón "Asistiré". */}
+        {/* Acción principal para quien asiste */}
+        {puedeAsistir ? (
+          <TouchableOpacity
+            style={[
+              styles.botonPrincipal,
+              asistire && styles.botonActivo,
+              procesando && styles.botonDeshabilitado,
+            ]}
+            onPress={confirmarAsistencia}
+            disabled={procesando || asistire}
+            activeOpacity={0.85}
+          >
+            <MaterialIcons
+              name={asistire ? "check-circle" : "event-available"}
+              size={20}
+              color="#FFF"
+            />
+            <Text style={styles.botonPrincipalTexto}>
+              {procesando
+                ? "Procesando..."
+                : asistire
+                  ? "Asistencia confirmada"
+                  : "Asistiré"}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {/* Recordatorio (secundario) */}
         {!esAdmin ? (
           <TouchableOpacity
-            style={[styles.botonPrincipal, recordatorio && styles.botonActivo]}
+            style={[styles.botonSecundario, styles.botonRecordar]}
             onPress={toggleRecordatorio}
             activeOpacity={0.85}
           >
             <MaterialIcons
               name={recordatorio ? "notifications-active" : "notifications-none"}
               size={20}
-              color="#FFF"
+              color="#5B4BDB"
             />
-            <Text style={styles.botonPrincipalTexto}>
+            <Text style={styles.botonSecundarioText}>
               {recordatorio ? "Recordatorio activado" : "Recordarme"}
             </Text>
           </TouchableOpacity>
@@ -259,6 +321,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   botonActivo: { backgroundColor: "#2E7D32" },
+  botonDeshabilitado: { opacity: 0.6 },
+  botonRecordar: { flex: 0 },
   botonPrincipalTexto: { color: "#FFF", fontWeight: "700", fontSize: 15 },
   filaAcciones: { flexDirection: "row", gap: 10 },
   botonSecundario: {
