@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
 import { actualizarPerfil, cerrarSesion } from "../services/authService";
 import { INTERESES } from "../data/categorias";
 
@@ -61,12 +62,21 @@ export default function PerfilScreen({ sesion }) {
     Alert.alert("Perfil actualizado", "Tus cambios se guardaron correctamente.");
   };
 
-  const salir = async () => {
-    try {
-      await cerrarSesion();
-    } catch (e) {
-      console.log("No se pudo cerrar sesión:", e.message);
-    }
+  const salir = () => {
+    Alert.alert("Cerrar sesión", "¿Seguro que deseas salir de tu cuenta?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Salir",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await cerrarSesion();
+          } catch (e) {
+            Alert.alert("Error", "No se pudo cerrar sesión.");
+          }
+        },
+      },
+    ]);
   };
 
   return (
@@ -146,7 +156,12 @@ export default function PerfilScreen({ sesion }) {
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={salir} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.botonCerrarSesion}
+          onPress={salir}
+          activeOpacity={0.8}
+        >
+          <MaterialIcons name="logout" size={20} color="#E53935" />
           <Text style={styles.cerrarSesion}>Cerrar sesión</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -217,11 +232,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
+  botonCerrarSesion: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 14,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "#E53935",
+    backgroundColor: "#FFF",
+  },
   cerrarSesion: {
-    textAlign: "center",
     color: "#E53935",
-    fontSize: 14,
-    fontWeight: "600",
-    marginTop: 22,
+    fontSize: 15,
+    fontWeight: "700",
   },
 });

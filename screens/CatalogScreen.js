@@ -12,12 +12,11 @@ import {
   Alert,
 } from "react-native";
 import { Image } from "expo-image";
-import { useRoute } from "@react-navigation/native"; // Importante para leer los parámetros pasados
+import { useRoute } from "@react-navigation/native";
 import useEventos from "../hooks/useEventos";
 import useFavoritos from "../hooks/useFavoritos";
-import { cerrarSesion as cerrarSesionUsuario } from "../services/authService";
+import { mostrarFechaCorta } from "../utils/fechaEvento";
 
-// Diccionario para traducir los IDs seleccionados a los textos de tus categorías reales
 const TRADUCCION_CATEGORIAS = {
   kpop: "K-pop",
   conciertos: "Conciertos",
@@ -33,7 +32,7 @@ const TRADUCCION_CATEGORIAS = {
   festivales: "Festivales",
 };
 
-function EventCard({ evento, esFavorito, onToggleFavorito, onPress }) {
+function EventCard({ evento, esFavorito, onToggleFavorito, onPress, esAdmin }) {
   return (
     <TouchableOpacity
       style={styles.card}
@@ -54,13 +53,18 @@ function EventCard({ evento, esFavorito, onToggleFavorito, onPress }) {
             <Text style={styles.sinImagenIcono}>🎉</Text>
           </View>
         )}
-        <TouchableOpacity
-          style={styles.favButton}
-          onPress={() => onToggleFavorito(evento.id)}
-        >
-          <Text style={styles.favIcon}>{esFavorito ? "❤️" : "🤍"}</Text>
-        </TouchableOpacity>
+
+        {/* Solo muestra el corazón si NO es administrador */}
+        {!esAdmin && (
+          <TouchableOpacity
+            style={styles.favButton}
+            onPress={() => onToggleFavorito(evento.id)}
+          >
+            <Text style={styles.favIcon}>{esFavorito ? "❤️" : "🤍"}</Text>
+          </TouchableOpacity>
+        )}
       </View>
+
       <View style={styles.info}>
         <View style={styles.rowTop}>
           <Text style={styles.categoria}>{evento.categoria}</Text>
@@ -68,7 +72,7 @@ function EventCard({ evento, esFavorito, onToggleFavorito, onPress }) {
         </View>
         <Text style={styles.titulo}>{evento.titulo}</Text>
         <Text style={styles.detalle}>
-          {evento.fecha}
+          {mostrarFechaCorta(evento.fecha)}
           {evento.hora ? ` · ${evento.hora}` : ""}
         </Text>
         <Text style={styles.detalle}>{evento.lugar}</Text>
@@ -78,29 +82,32 @@ function EventCard({ evento, esFavorito, onToggleFavorito, onPress }) {
 }
 
 export default function CatalogScreen({ navigation, sesion }) {
+  // Verifica si el usuario tiene rol de administrador
+  const esAdmin = sesion?.rol === "administrador";
   const { eventos, loading, refreshing, error, recargar, reintentar } =
     useEventos(sesion);
 
-  const route = useRoute(); // Acceder a los parámetros enviados por InterestsScreen
+  const route = useRoute();
 
   const [busqueda, setBusqueda] = useState("");
   const [categoria, setCategoria] = useState("Todos");
-  const { favoritos, cargandoFavoritos, errorFavoritos, alternarFavorito, reintentarFavoritos } = useFavoritos(sesion?.uid);
+  const {
+    favoritos,
+    cargandoFavoritos,
+    errorFavoritos,
+    alternarFavorito,
+    reintentarFavoritos,
+  } = useFavoritos(esAdmin ? null : sesion?.uid);
   const [soloFavoritos, setSoloFavoritos] = useState(false);
-
-  const cerrarSesion = async () => {
-  try {
-    await cerrarSesionUsuario();
-  } catch (e) {
-    console.log("No se pudo cerrar sesión:", e.message);
-  }
-};
 
   const toggleFavorito = async (id) => {
     try {
       await alternarFavorito(id);
     } catch (e) {
-      Alert.alert("Favoritos", "No se pudo guardar el favorito. Intenta nuevamente.");
+      Alert.alert(
+        "Favoritos",
+        "No se pudo guardar el favorito. Intenta nuevamente.",
+      );
     }
   };
 
@@ -110,26 +117,22 @@ export default function CatalogScreen({ navigation, sesion }) {
   );
 
   const eventosFiltrados = useMemo(() => {
-    // 1. Obtener los IDs enviados por la navegación (si no hay ninguno, usamos la sesión o vacío)
     const interesesIds = sesion?.intereses || [];
 
-    // 2. Mapear esos IDs (ej: 'arte') a strings legibles (ej: 'Arte y Cultura')
     const misInteresesTexto = interesesIds.map(
       (id) => TRADUCCION_CATEGORIAS[id] || id,
     );
 
-    // 3. Filtrar por búsqueda, categoría activa y favoritos de manera común
     const filtrados = eventos.filter((e) => {
       const coincideTexto =
         e.titulo.toLowerCase().includes(busqueda.toLowerCase()) ||
         e.lugar.toLowerCase().includes(busqueda.toLowerCase());
       const coincideCategoria =
         categoria === "Todos" || e.categoria === categoria;
-      const coincideFav = !soloFavoritos || favoritos.includes(e.id);
+      const coincideFav = esAdmin || !soloFavoritos || favoritos.includes(e.id);
       return coincideTexto && coincideCategoria && coincideFav;
     });
 
-    // 4. Reordenar priorizando de forma dinámica los intereses reales que elegiste
     if (categoria === "Todos") {
       return [...filtrados].sort((a, b) => {
         const limpiar = (str) => str.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -156,10 +159,11 @@ export default function CatalogScreen({ navigation, sesion }) {
     favoritos,
     sesion,
     route.params?.intereses,
+    esAdmin,
   ]);
 
   const renderContenido = () => {
-    if (loading || cargandoFavoritos) {
+    if (loading || (!esAdmin && cargandoFavoritos)) {
       return (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#5B4BDB" />
@@ -188,6 +192,7 @@ export default function CatalogScreen({ navigation, sesion }) {
             evento={item}
             esFavorito={favoritos.includes(item.id)}
             onToggleFavorito={toggleFavorito}
+            esAdmin={esAdmin}
             onPress={() =>
               navigation.navigate("DetalleEvento", { evento: item })
             }
@@ -207,38 +212,43 @@ export default function CatalogScreen({ navigation, sesion }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.headerTitle}>Eventos en Lima</Text>
-            <Text style={styles.headerSubtitle}>
-              Descubre qué hacer cerca de ti
-            </Text>
-          </View>
-          <TouchableOpacity onPress={cerrarSesion} style={styles.logoutButton}>
-            <Text style={styles.logoutText}>Cerrar sesión</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.headerTitle}>Eventos en Lima</Text>
+        <Text style={styles.headerSubtitle}>
+          Descubre qué hacer cerca de ti
+        </Text>
       </View>
 
       <View style={styles.filtros}>
-        {errorFavoritos ? <TouchableOpacity onPress={reintentarFavoritos}><Text style={styles.mensaje}>{errorFavoritos} Toca para reintentar.</Text></TouchableOpacity> : null}
+        {!esAdmin && errorFavoritos ? (
+          <TouchableOpacity onPress={reintentarFavoritos}>
+            <Text style={styles.mensaje}>
+              {errorFavoritos} Toca para reintentar.
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
         <TextInput
           style={styles.input}
           placeholder="Buscar por nombre o lugar..."
           value={busqueda}
           onChangeText={setBusqueda}
         />
+
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <TouchableOpacity
-            style={[styles.chip, soloFavoritos && styles.chipActivo]}
-            onPress={() => setSoloFavoritos(!soloFavoritos)}
-          >
-            <Text
-              style={[styles.chipText, soloFavoritos && styles.chipTextActivo]}
+          {/* Solo muestra el chip de Favoritos si NO es administrador */}
+          {!esAdmin && (
+            <TouchableOpacity
+              style={[styles.chip, soloFavoritos && styles.chipActivo]}
+              onPress={() => setSoloFavoritos(!soloFavoritos)}
             >
-              ❤️ Favoritos
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={[styles.chipText, soloFavoritos && styles.chipTextActivo]}
+              >
+                ❤️ Favoritos
+              </Text>
+            </TouchableOpacity>
+          )}
+
           {categorias.map((cat) => (
             <TouchableOpacity
               key={cat}
@@ -263,12 +273,13 @@ export default function CatalogScreen({ navigation, sesion }) {
   );
 }
 
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F4F6FF" },
   header: { padding: 20, paddingTop: 50, backgroundColor: "#5B4BDB" },
   headerTitle: { fontSize: 24, fontWeight: "bold", color: "#FFF" },
   headerSubtitle: { fontSize: 14, color: "#E0DDFF", marginTop: 4 },
-  list: { padding: 15 },
+  list: { paddingHorizontal: 15, paddingTop: 2, paddingBottom: 20 },
   card: {
     backgroundColor: "#FFF",
     borderRadius: 14,
@@ -296,27 +307,8 @@ const styles = StyleSheet.create({
   },
   titulo: { fontSize: 17, fontWeight: "bold", color: "#222", marginBottom: 4 },
   detalle: { fontSize: 13, color: "#777" },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  logoutButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#FFF",
-  },
-  logoutText: { color: "#FFF", fontSize: 12, fontWeight: "600" },
-  rowTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 4,
-  },
   precio: { fontSize: 12, fontWeight: "700", color: "#2E7D32" },
-  filtros: { paddingHorizontal: 15, paddingTop: 12 },
+  filtros: { paddingHorizontal: 15, paddingTop: 12, paddingBottom: 10 },
   input: {
     backgroundColor: "#FFF",
     borderRadius: 10,

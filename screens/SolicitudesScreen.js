@@ -57,20 +57,36 @@ export default function SolicitudesScreen({ sesion, navigation }) {
   const [motivo, setMotivo] = React.useState("");
   const [guardando, setGuardando] = React.useState(false);
 
-  const aceptar = async (solicitud) => {
+  const aceptar = (solicitud) => {
     if (guardando) return;
-    setGuardando(true);
-    try {
-      const resultado = await aceptarSolicitud(solicitud.id);
-      Alert.alert(resultado ? "Solicitud aceptada" : "Solicitud no disponible", resultado
-        ? `"${solicitud.titulo}" ya aparece en la pestaña Eventos.`
-        : "La solicitud ya fue procesada.");
-    } catch (e) {
-      Alert.alert("Error", "No se pudo aprobar la solicitud.");
-    } finally {
-      setGuardando(false);
-    }
+    Alert.alert(
+      "Aprobar evento",
+      `¿Quieres publicar "${solicitud.titulo}" en el catálogo?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Sí, publicar",
+          onPress: async () => {
+            setGuardando(true);
+            try {
+              const resultado = await aceptarSolicitud(solicitud.id);
+              Alert.alert(
+                resultado ? "Solicitud aceptada" : "Solicitud no disponible",
+                resultado
+                  ? `"${solicitud.titulo}" ya aparece en la pestaña Eventos.`
+                  : "La solicitud ya fue procesada."
+              );
+            } catch (e) {
+              Alert.alert("Error", "No se pudo aprobar la solicitud.");
+            } finally {
+              setGuardando(false);
+            }
+          },
+        },
+      ]
+    );
   };
+
 
   const eliminar = (solicitud) => {
     setMotivo(""); setSolicitudRechazo(solicitud);

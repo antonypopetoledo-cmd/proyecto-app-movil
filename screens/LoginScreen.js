@@ -10,11 +10,11 @@ import {
   ActivityIndicator,
 } from "react-native";
 import {
-  USUARIO_PRUEBA,
   registrarUsuario,
   iniciarSesionConCuenta,
   recuperarContrasena,
 } from "../services/authService";
+import { MaterialIcons } from "@expo/vector-icons";
 
 const REGEX_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -24,7 +24,9 @@ export default function LoginScreen() {
   const [apellido, setApellido] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [verContrasena, setVerContrasena] = useState(false);
   const [confirmar, setConfirmar] = useState("");
+  const [verConfirmar, setVerConfirmar] = useState(false);
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
 
@@ -33,6 +35,8 @@ export default function LoginScreen() {
   const cambiarModo = () => {
     setModo(esRegistro ? "login" : "registro");
     setError("");
+    setVerContrasena(false);
+    setVerConfirmar(false);
   };
 
   const validarRegistro = () => {
@@ -60,7 +64,6 @@ export default function LoginScreen() {
       setError(resultado.mensaje);
       return;
     }
-    // App.js detecta la sesión y muestra la siguiente pantalla
     Alert.alert("Bienvenido a LimaGo", "Tu cuenta ha sido creada exitosamente.");
   };
 
@@ -93,12 +96,6 @@ export default function LoginScreen() {
     } else {
       Alert.alert(resultado.titulo, resultado.mensaje);
     }
-  };
-
-  const usarCuentaDePrueba = () => {
-    setEmail(USUARIO_PRUEBA.email);
-    setPassword(USUARIO_PRUEBA.password);
-    setError("");
   };
 
   return (
@@ -157,28 +154,54 @@ export default function LoginScreen() {
         />
 
         <Text style={styles.label}>Contraseña</Text>
-        <TextInput
-          style={styles.input}
-          placeholder={esRegistro ? "Mínimo 8 caracteres y un número" : "Tu contraseña"}
-          placeholderTextColor="#999"
-          secureTextEntry
-          autoCapitalize="none"
-          value={password}
-          onChangeText={setPassword}
-        />
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder={esRegistro ? "Mínimo 8 caracteres y un número" : "Tu contraseña"}
+            placeholderTextColor="#999"
+            secureTextEntry={!verContrasena}
+            autoCapitalize="none"
+            value={password}
+            onChangeText={setPassword}
+          />
+          <TouchableOpacity
+            style={styles.eyeButton}
+            onPress={() => setVerContrasena(!verContrasena)}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons
+              name={verContrasena ? "visibility" : "visibility-off"}
+              size={22}
+              color="#777"
+            />
+          </TouchableOpacity>
+        </View>
 
         {esRegistro && (
           <>
             <Text style={styles.label}>Confirmar contraseña</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Repite tu contraseña"
-              placeholderTextColor="#999"
-              secureTextEntry
-              autoCapitalize="none"
-              value={confirmar}
-              onChangeText={setConfirmar}
-            />
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Repite tu contraseña"
+                placeholderTextColor="#999"
+                secureTextEntry={!verConfirmar}
+                autoCapitalize="none"
+                value={confirmar}
+                onChangeText={setConfirmar}
+              />
+              <TouchableOpacity
+                style={styles.eyeButton}
+                onPress={() => setVerConfirmar(!verConfirmar)}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons
+                  name={verConfirmar ? "visibility" : "visibility-off"}
+                  size={22}
+                  color="#777"
+                />
+              </TouchableOpacity>
+            </View>
           </>
         )}
 
@@ -198,14 +221,9 @@ export default function LoginScreen() {
         </TouchableOpacity>
 
         {!esRegistro && (
-          <>
-            <TouchableOpacity onPress={olvideContrasena} activeOpacity={0.7}>
-              <Text style={styles.link}>¿Olvidaste tu contraseña?</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={usarCuentaDePrueba} activeOpacity={0.7}>
-              <Text style={styles.link}>Usar cuenta de prueba ({USUARIO_PRUEBA.email})</Text>
-            </TouchableOpacity>
-          </>
+          <TouchableOpacity onPress={olvideContrasena} activeOpacity={0.7}>
+            <Text style={styles.link}>¿Olvidaste tu contraseña?</Text>
+          </TouchableOpacity>
         )}
 
         <View style={styles.separatorContainer}>
@@ -267,6 +285,29 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#222",
   },
+  passwordContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 50,
+    borderWidth: 1,
+    borderColor: "#DDD",
+    backgroundColor: "#FAFAFA",
+    marginBottom: 15,
+    borderRadius: 10,
+  },
+  passwordInput: {
+    flex: 1,
+    height: "100%",
+    paddingHorizontal: 15,
+    fontSize: 15,
+    color: "#222",
+  },
+  eyeButton: {
+    paddingHorizontal: 14,
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   button: {
     backgroundColor: "#5B4BDB",
     paddingVertical: 15,
@@ -282,20 +323,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
-  error: { color: "#E53935", fontSize: 13, marginBottom: 10 },
   link: {
-    textAlign: "center",
     color: "#5B4BDB",
-    fontSize: 13,
+    textAlign: "center",
+    marginTop: 15,
+    fontSize: 14,
     fontWeight: "600",
-    marginTop: 16,
   },
   separatorContainer: {
-    flexDirection: "row",
-    alignItems: "center",
     marginVertical: 20,
+    alignItems: "center",
   },
-  line: { flex: 1, height: 1, backgroundColor: "#E0E0E0" },
-  toggleText: { textAlign: "center", color: "#666", fontSize: 14 },
-  toggleAccion: { color: "#5B4BDB", fontWeight: "700" },
+  line: {
+    width: "100%",
+    height: 1,
+    backgroundColor: "#EAEAEA",
+  },
+  toggleText: {
+    textAlign: "center",
+    color: "#666",
+    fontSize: 14,
+  },
+  toggleAccion: {
+    color: "#5B4BDB",
+    fontWeight: "bold",
+  },
+  error: {
+    color: "#D32F2F",
+    fontSize: 13,
+    textAlign: "center",
+    marginBottom: 12,
+  },
 });

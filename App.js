@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { enviarCorreoConfirmacion } from './services/emailService';
@@ -10,7 +10,6 @@ import PestanasPrincipales from './navigation/PestanasPrincipales';
 import EditarEventoScreen from './screens/EditarEventoScreen';
 import EditarSolicitudScreen from './screens/EditarSolicitudScreen';
 import { inicializarAuth, suscribirSesion, obtenerSesion } from './services/authService';
-import { migrarDatosLocales } from './services/migracionLocalService';
 
 const Stack = createNativeStackNavigator();
 
@@ -21,22 +20,14 @@ export default function App() {
   useEffect(() => {
     let activo = true;
     inicializarAuth()
-      .then(async (sesionInicial) => {
-        if (sesionInicial) {
-          try { await migrarDatosLocales(sesionInicial); }
-          catch (e) { Alert.alert("Migración pendiente", e.message); }
-        }
+      .then((sesionInicial) => {
         if (activo) setSesion(sesionInicial);
       })
       .catch((e) => console.log("Error al iniciar:", e.message))
       .finally(() => { if (activo) setCargado(true); });
 
     const desuscribir = suscribirSesion(() => {
-      obtenerSesion().then(async (s) => {
-        if (s) {
-          try { await migrarDatosLocales(s); }
-          catch (e) { Alert.alert("Migración pendiente", e.message); }
-        }
+      obtenerSesion().then((s) => {
         if (activo) setSesion(s);
       });
     });

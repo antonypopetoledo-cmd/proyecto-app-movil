@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { eliminarEvento } from "../services/eventosService";
 import { registrarAsistencia } from "../services/asistenciasService";
 import { enviarCorreoConfirmacion } from "../services/emailService";
+import useFavoritos from "../hooks/useFavoritos";
 
 // Fila con icono + etiqueta y su valor debajo
 const Dato = ({ icono, etiqueta, children }) => (
@@ -29,51 +30,53 @@ const Dato = ({ icono, etiqueta, children }) => (
 export default function DetalleEventoScreen({ route, navigation, sesion }) {
   const { evento } = route.params;
   const esSolicitud = route.params.esSolicitud === true;
-  const [recordatorio, setRecordatorio] = useState(false);
-  const [asistire, setAsistire] = useState(false);
+  const [recordatorioEnviado, setRecordatorioEnviado] = useState(false);
   const [procesando, setProcesando] = useState(false);
+  const { favoritos, alternarFavorito } = useFavoritos(sesion?.uid);
+  const esFavorito = favoritos.includes(evento.id);
+
+  const toggleFavorito = async () => {
+    try {
+      await alternarFavorito(evento.id);
+    } catch (e) {
+      Alert.alert("Favoritos", "No se pudo actualizar favoritos.");
+    }
+  };
+
   const insets = useSafeAreaInsets();
 
   const esAdmin = sesion?.rol === "administrador";
   const puedeGestionar = esAdmin && !esSolicitud;
-  // "Asistiré" solo para usuarios y solo en eventos ya publicados (no en solicitudes pendientes)
-  const puedeAsistir = !esAdmin && !esSolicitud;
+  // "Recordarme" solo para usuarios y solo en eventos ya publicados (no en solicitudes pendientes)
+  const puedeGuardarRecordatorio = !esAdmin && !esSolicitud;
 
-  // registrarAsistencia (Firestore) devuelve true si creó la asistencia y false si ya existía.
-  // El correo se envía solo en el primer registro.
-  const confirmarAsistencia = async () => {
-    if (procesando || asistire) return;
+  // registrarAsistencia (Firestore) devuelve true si creó el registro y false si ya existía.
+  // El correo de recordatorio se envía solo en el primer registro.
+  const activarRecordatorioCorreo = async () => {
+    if (procesando || recordatorioEnviado) return;
     setProcesando(true);
     try {
       const creada = await registrarAsistencia(sesion.uid, evento.id);
-      setAsistire(true);
+      setRecordatorioEnviado(true);
       if (!creada) {
         Alert.alert(
-          "Ya estabas registrado",
-          "Ya habías confirmado tu asistencia a este evento.",
+          "Recordatorio ya activado",
+          "Ya habías guardado este evento y recibido su recordatorio.",
         );
         return;
       }
       const correo = await enviarCorreoConfirmacion({ sesion, evento });
       Alert.alert(
-        "¡Asistencia confirmada!",
+        "¡Recordatorio activado!",
         correo.ok
-          ? `Te enviamos un correo de confirmación a ${sesion.email}.`
-          : "Quedaste registrado, pero no pudimos enviar el correo de confirmación.",
+          ? `Guardamos el evento y te enviamos los detalles a ${sesion.email}.`
+          : "Guardamos el evento en tu lista, pero no pudimos enviar el correo de recordatorio.",
       );
     } catch (e) {
-      Alert.alert("No se pudo confirmar", e?.message || "Inténtalo de nuevo.");
+      Alert.alert("No se pudo activar", e?.message || "Inténtalo de nuevo.");
     } finally {
       setProcesando(false);
     }
-  };
-
-  const toggleRecordatorio = () => {
-    setRecordatorio(!recordatorio);
-    Alert.alert(
-      recordatorio ? "Recordatorio quitado" : "Recordatorio activado",
-      evento.titulo,
-    );
   };
 
   const abrirMapa = () => {
@@ -137,8 +140,21 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
               <MaterialIcons name="delete-outline" size={22} color="#E53935" />
             </TouchableOpacity>
           </View>
+        ) : !esSolicitud ? (
+          <TouchableOpacity
+            style={styles.botonCircular}
+            onPress={toggleFavorito}
+            accessibilityLabel="Favorito"
+          >
+            <MaterialIcons
+              name={esFavorito ? "favorite" : "favorite-border"}
+              size={22}
+              color={esFavorito ? "#E53935" : "#222"}
+            />
+          </TouchableOpacity>
         ) : null}
       </View>
+
 
       <ScrollView>
         {evento.imagen ? (
@@ -187,67 +203,55 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
 
       {/* Botones fijos abajo */}
       <View style={[styles.pie, { paddingBottom: insets.bottom + 12 }]}>
-        {/* Acción principal para quien asiste */}
-        {puedeAsistir ? (
+        {/* Acción principal: ir al sitio oficial para entradas */}
+        {evento.enlace ? (
           <TouchableOpacity
-            style={[
-              styles.botonPrincipal,
-              asistire && styles.botonActivo,
-              procesando && styles.botonDeshabilitado,
-            ]}
-            onPress={confirmarAsistencia}
-            disabled={procesando || asistire}
+            style={styles.botonPrincipal}
+            onPress={abrirEnlace}
             activeOpacity={0.85}
           >
-            <MaterialIcons
-              name={asistire ? "check-circle" : "event-available"}
-              size={20}
-              color="#FFF"
-            />
-            <Text style={styles.botonPrincipalTexto}>
-              {procesando
-                ? "Procesando..."
-                : asistire
-                  ? "Asistencia confirmada"
-                  : "Asistiré"}
-            </Text>
+            <MaterialIcons name="confirmation-number" size={20} color="#FFF" />
+            <Text style={styles.botonPrincipalTexto}>Conseguir entradas</Text>
           </TouchableOpacity>
         ) : null}
 
-        {/* Recordatorio (secundario) */}
-        {!esAdmin ? (
-          <TouchableOpacity
-            style={[styles.botonSecundario, styles.botonRecordar]}
-            onPress={toggleRecordatorio}
-            activeOpacity={0.85}
-          >
-            <MaterialIcons
-              name={recordatorio ? "notifications-active" : "notifications-none"}
-              size={20}
-              color="#5B4BDB"
-            />
-            <Text style={styles.botonSecundarioText}>
-              {recordatorio ? "Recordatorio activado" : "Recordarme"}
-            </Text>
-          </TouchableOpacity>
-        ) : null}
-
-        {/* Acciones de consulta */}
+        {/* Fila inferior: Recordarme (con correo) y Mapa */}
         <View style={styles.filaAcciones}>
-          {evento.enlace ? (
+          {puedeGuardarRecordatorio ? (
             <TouchableOpacity
-              style={styles.botonSecundario}
-              onPress={abrirEnlace}
+              style={[
+                styles.botonSecundario,
+                recordatorioEnviado && styles.botonSecundarioActivo,
+                procesando && styles.botonDeshabilitado,
+              ]}
+              onPress={activarRecordatorioCorreo}
+              disabled={procesando || recordatorioEnviado}
               activeOpacity={0.85}
             >
               <MaterialIcons
-                name="confirmation-number"
+                name={
+                  recordatorioEnviado
+                    ? "notifications-active"
+                    : "notifications-none"
+                }
                 size={20}
-                color="#5B4BDB"
+                color={recordatorioEnviado ? "#2E7D32" : "#5B4BDB"}
               />
-              <Text style={styles.botonSecundarioText}>Sitio oficial</Text>
+              <Text
+                style={[
+                  styles.botonSecundarioText,
+                  recordatorioEnviado && { color: "#2E7D32" },
+                ]}
+              >
+                {procesando
+                  ? "Enviando..."
+                  : recordatorioEnviado
+                    ? "Recordatorio enviado"
+                    : "Recordarme"}
+              </Text>
             </TouchableOpacity>
           ) : null}
+
           <TouchableOpacity
             style={styles.botonSecundario}
             onPress={abrirMapa}
@@ -261,6 +265,7 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F4F6FF" },
@@ -337,4 +342,8 @@ const styles = StyleSheet.create({
     borderColor: "#5B4BDB",
   },
   botonSecundarioText: { color: "#5B4BDB", fontWeight: "600", fontSize: 14 },
+  botonSecundarioActivo: {
+  borderColor: "#2E7D32",
+  backgroundColor: "#E8F5E9",
+},
 });
