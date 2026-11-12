@@ -40,12 +40,21 @@ export default function LoginScreen() {
   };
 
   const validarRegistro = () => {
-    if (!nombre.trim() || !apellido.trim() || !email.trim() || !password || !confirmar) {
+    if (
+      !nombre.trim() ||
+      !apellido.trim() ||
+      !email.trim() ||
+      !password ||
+      !confirmar
+    ) {
       return "Todos los campos son obligatorios";
     }
-    if (!REGEX_EMAIL.test(email.trim())) return "El correo debe tener un formato válido";
-    if (password.length < 8) return "La contraseña debe tener al menos 8 caracteres";
-    if (!/\d/.test(password)) return "La contraseña debe incluir al menos un número";
+    if (!REGEX_EMAIL.test(email.trim()))
+      return "El correo debe tener un formato válido";
+    if (password.length < 8)
+      return "La contraseña debe tener al menos 8 caracteres";
+    if (!/\d/.test(password))
+      return "La contraseña debe incluir al menos un número";
     if (password !== confirmar) return "Las contraseñas no coinciden";
     return "";
   };
@@ -58,13 +67,21 @@ export default function LoginScreen() {
     }
     setError("");
     setCargando(true);
-    const resultado = await registrarUsuario({ nombre, apellido, email, password });
+    const resultado = await registrarUsuario({
+      nombre,
+      apellido,
+      email,
+      password,
+    });
     setCargando(false);
     if (!resultado.ok) {
       setError(resultado.mensaje);
       return;
     }
-    Alert.alert("Bienvenido a LimaGo", "Tu cuenta ha sido creada exitosamente.");
+    Alert.alert(
+      "Bienvenido a LimaGo",
+      "Tu cuenta ha sido creada exitosamente.",
+    );
   };
 
   const iniciarSesion = async () => {
@@ -87,12 +104,18 @@ export default function LoginScreen() {
 
   const olvideContrasena = async () => {
     if (!REGEX_EMAIL.test(email.trim())) {
-      Alert.alert("Recuperar contraseña", "Escribe tu correo arriba y vuelve a pulsar este enlace.");
+      Alert.alert(
+        "Recuperar contraseña",
+        "Escribe tu correo arriba y vuelve a pulsar este enlace.",
+      );
       return;
     }
     const resultado = await recuperarContrasena(email);
     if (resultado.ok) {
-      Alert.alert("Revisa tu correo", "Si la cuenta existe, te enviamos un enlace para crear una nueva contraseña.");
+      Alert.alert(
+        "Revisa tu correo",
+        "Si la cuenta existe, te enviamos un enlace para crear una nueva contraseña.",
+      );
     } else {
       Alert.alert(resultado.titulo, resultado.mensaje);
     }
@@ -104,17 +127,39 @@ export default function LoginScreen() {
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
     >
-      <View style={styles.header}>
-        <Text style={styles.logo}>LimaGo</Text>
-        <Text style={styles.subtitle}>Descubre lo que está pasando en Lima</Text>
-      </View>
+      {esRegistro ? (
+        <View style={styles.topBarRegistro}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={cambiarModo}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="arrow-back" size={22} color="#5B4BDB" />
+            <Text style={styles.backText}>Volver</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.header}>
+          <View style={styles.logoBadge}>
+            <MaterialIcons name="local-activity" size={34} color="#5B4BDB" />
+          </View>
+          <Text style={styles.logo}>
+            <Text style={styles.logoDark}>Lima</Text>Go
+          </Text>
+          <Text style={styles.subtitle}>
+            Tu guía de eventos y planes en Lima
+          </Text>
+        </View>
+      )}
 
       <View style={styles.card}>
-        <Text style={styles.title}>{esRegistro ? "¡Únete a LimaGo!" : "Bienvenido de vuelta"}</Text>
+        <Text style={styles.title}>
+          {esRegistro ? "¡Súmate a LimaGo!" : "¡Bienvenido de vuelta!"}
+        </Text>
         <Text style={styles.description}>
           {esRegistro
-            ? "Crea tu cuenta para encontrar eventos y publicar los tuyos."
-            : "Inicia sesión para ver los eventos que te interesan."}
+            ? "Crea tu cuenta gratis y descubre los mejores planes cerca de ti."
+            : "Inicia sesión para explorar eventos, guardar favoritos y más."}
         </Text>
 
         {esRegistro && (
@@ -142,22 +187,38 @@ export default function LoginScreen() {
         )}
 
         <Text style={styles.label}>Correo electrónico</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="ejemplo@correo.com"
-          placeholderTextColor="#999"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          value={email}
-          onChangeText={setEmail}
-        />
+        <View style={styles.inputIconContainer}>
+          <MaterialIcons
+            name="mail-outline"
+            size={20}
+            color="#888"
+            style={styles.leftIcon}
+          />
+          <TextInput
+            style={styles.inputWithIcon}
+            placeholder="ejemplo@correo.com"
+            placeholderTextColor="#999"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={email}
+            onChangeText={setEmail}
+          />
+        </View>
 
         <Text style={styles.label}>Contraseña</Text>
         <View style={styles.passwordContainer}>
+          <MaterialIcons
+            name="lock-outline"
+            size={20}
+            color="#888"
+            style={styles.leftIcon}
+          />
           <TextInput
             style={styles.passwordInput}
-            placeholder={esRegistro ? "Mínimo 8 caracteres y un número" : "Tu contraseña"}
+            placeholder={
+              esRegistro ? "Mínimo 8 caracteres y un número" : "Tu contraseña"
+            }
             placeholderTextColor="#999"
             secureTextEntry={!verContrasena}
             autoCapitalize="none"
@@ -181,6 +242,12 @@ export default function LoginScreen() {
           <>
             <Text style={styles.label}>Confirmar contraseña</Text>
             <View style={styles.passwordContainer}>
+              <MaterialIcons
+                name="lock-outline"
+                size={20}
+                color="#888"
+                style={styles.leftIcon}
+              />
               <TextInput
                 style={styles.passwordInput}
                 placeholder="Repite tu contraseña"
@@ -216,7 +283,9 @@ export default function LoginScreen() {
           {cargando ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.buttonText}>{esRegistro ? "Crear cuenta" : "Iniciar sesión"}</Text>
+            <Text style={styles.buttonText}>
+              {esRegistro ? "Crear cuenta" : "Iniciar sesión"}
+            </Text>
           )}
         </TouchableOpacity>
 
@@ -233,7 +302,9 @@ export default function LoginScreen() {
         <TouchableOpacity onPress={cambiarModo} activeOpacity={0.7}>
           <Text style={styles.toggleText}>
             {esRegistro ? "¿Ya tienes cuenta? " : "¿No tienes cuenta? "}
-            <Text style={styles.toggleAccion}>{esRegistro ? "Inicia sesión" : "Crea una"}</Text>
+            <Text style={styles.toggleAccion}>
+              {esRegistro ? "Inicia sesión" : "Crea una"}
+            </Text>
           </Text>
         </TouchableOpacity>
       </View>
@@ -248,14 +319,48 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 20,
   },
-  header: { alignItems: "center", marginBottom: 25 },
+  header: { alignItems: "center", marginBottom: 24 },
+  logoBadge: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: "#EBE8FF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 10,
+  },
   logo: {
-    fontSize: 42,
+    fontSize: 40,
     fontWeight: "bold",
     color: "#5B4BDB",
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
-  subtitle: { fontSize: 15, color: "#555", marginTop: 5, textAlign: "center" },
+  logoDark: {
+    color: "#222222",
+  },
+  subtitle: { fontSize: 15, color: "#555", marginTop: 4, textAlign: "center" },
+  topBarRegistro: {
+    width: "100%",
+    marginTop: 25,
+    marginBottom: 12,
+    alignItems: "flex-start",
+  },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E6F5",
+  },
+  backText: {
+    color: "#5B4BDB",
+    fontSize: 15,
+    fontWeight: "600",
+  },
   card: {
     backgroundColor: "#FFFFFF",
     padding: 25,
@@ -266,7 +371,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
-  title: { fontSize: 25, fontWeight: "bold", color: "#222", marginBottom: 8 },
+  title: { fontSize: 24, fontWeight: "bold", color: "#222", marginBottom: 6 },
   description: {
     fontSize: 14,
     color: "#777",
@@ -285,6 +390,26 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#222",
   },
+  inputIconContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 50,
+    borderWidth: 1,
+    borderColor: "#DDD",
+    backgroundColor: "#FAFAFA",
+    marginBottom: 15,
+    borderRadius: 10,
+  },
+  leftIcon: {
+    paddingLeft: 14,
+  },
+  inputWithIcon: {
+    flex: 1,
+    height: "100%",
+    paddingHorizontal: 10,
+    fontSize: 15,
+    color: "#222",
+  },
   passwordContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -298,7 +423,7 @@ const styles = StyleSheet.create({
   passwordInput: {
     flex: 1,
     height: "100%",
-    paddingHorizontal: 15,
+    paddingHorizontal: 10,
     fontSize: 15,
     color: "#222",
   },

@@ -14,6 +14,7 @@ import { actualizarPerfil, cerrarSesion } from "../services/authService";
 import { INTERESES } from "../data/categorias";
 
 export default function PerfilScreen({ sesion }) {
+  const esAdmin = sesion?.rol === "administrador";
   const [nombre, setNombre] = useState(sesion?.nombre || "");
   const [apellido, setApellido] = useState(sesion?.apellido || "");
   const [intereses, setIntereses] = useState(sesion?.intereses || []);
@@ -59,7 +60,10 @@ export default function PerfilScreen({ sesion }) {
       Alert.alert("No se pudo guardar", resultado.mensaje);
       return;
     }
-    Alert.alert("Perfil actualizado", "Tus cambios se guardaron correctamente.");
+    Alert.alert(
+      "Perfil actualizado",
+      "Tus cambios se guardaron correctamente.",
+    );
   };
 
   const salir = () => {
@@ -86,9 +90,21 @@ export default function PerfilScreen({ sesion }) {
           <Text style={styles.avatarTexto}>{iniciales}</Text>
         </View>
         <Text style={styles.headerNombre}>
-          {`${sesion?.nombre || ""} ${sesion?.apellido || ""}`.trim() || "Mi perfil"}
+          {`${sesion?.nombre || ""} ${sesion?.apellido || ""}`.trim() ||
+            "Mi perfil"}
         </Text>
         <Text style={styles.headerCorreo}>{sesion?.email}</Text>
+
+        <View style={[styles.badgeRol, esAdmin && styles.badgeRolAdmin]}>
+          <MaterialIcons
+            name={esAdmin ? "admin-panel-settings" : "person"}
+            size={14}
+            color="#FFF"
+          />
+          <Text style={styles.badgeRolTexto}>
+            {esAdmin ? "Administrador" : "Usuario"}
+          </Text>
+        </View>
       </View>
 
       <ScrollView
@@ -122,7 +138,9 @@ export default function PerfilScreen({ sesion }) {
           editable={false}
         />
 
-        <Text style={[styles.label, styles.tituloIntereses]}>Mis intereses</Text>
+        <Text style={[styles.label, styles.tituloIntereses]}>
+          Mis intereses
+        </Text>
         <View style={styles.grid}>
           {INTERESES.map((item) => {
             const activo = intereses.includes(item.id);
@@ -133,7 +151,9 @@ export default function PerfilScreen({ sesion }) {
                 onPress={() => toggleInteres(item.id)}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.chipText, activo && styles.chipTextActivo]}>
+                <Text
+                  style={[styles.chipText, activo && styles.chipTextActivo]}
+                >
                   {item.label}
                 </Text>
               </TouchableOpacity>
@@ -144,7 +164,10 @@ export default function PerfilScreen({ sesion }) {
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <TouchableOpacity
-          style={[styles.button, (!hayCambios || guardando) && styles.buttonDisabled]}
+          style={[
+            styles.button,
+            (!hayCambios || guardando) && styles.buttonDisabled,
+          ]}
           onPress={guardar}
           disabled={!hayCambios || guardando}
           activeOpacity={0.8}
@@ -189,6 +212,26 @@ const styles = StyleSheet.create({
   avatarTexto: { fontSize: 26, fontWeight: "bold", color: "#5B4BDB" },
   headerNombre: { fontSize: 20, fontWeight: "bold", color: "#FFF" },
   headerCorreo: { fontSize: 13, color: "#E0DDFF", marginTop: 2 },
+  badgeRol: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.18)",
+  },
+  badgeRolAdmin: {
+    backgroundColor: "rgba(255, 215, 0, 0.25)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 215, 0, 0.6)",
+  },
+  badgeRolTexto: {
+    color: "#FFF",
+    fontSize: 12,
+    fontWeight: "700",
+  },
   contenido: { padding: 20, paddingBottom: 30 },
   label: { fontSize: 14, fontWeight: "600", color: "#333", marginBottom: 7 },
   input: {

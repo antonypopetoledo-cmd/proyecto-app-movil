@@ -98,7 +98,6 @@ export default function CatalogScreen({ navigation, sesion }) {
     alternarFavorito,
     reintentarFavoritos,
   } = useFavoritos(esAdmin ? null : sesion?.uid);
-  const [soloFavoritos, setSoloFavoritos] = useState(false);
 
   const toggleFavorito = async (id) => {
     try {
@@ -129,8 +128,7 @@ export default function CatalogScreen({ navigation, sesion }) {
         e.lugar.toLowerCase().includes(busqueda.toLowerCase());
       const coincideCategoria =
         categoria === "Todos" || e.categoria === categoria;
-      const coincideFav = esAdmin || !soloFavoritos || favoritos.includes(e.id);
-      return coincideTexto && coincideCategoria && coincideFav;
+      return coincideTexto && coincideCategoria;
     });
 
     if (categoria === "Todos") {
@@ -155,11 +153,8 @@ export default function CatalogScreen({ navigation, sesion }) {
     eventos,
     busqueda,
     categoria,
-    soloFavoritos,
-    favoritos,
     sesion,
     route.params?.intereses,
-    esAdmin,
   ]);
 
   const renderContenido = () => {
@@ -235,20 +230,6 @@ export default function CatalogScreen({ navigation, sesion }) {
         />
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {/* Solo muestra el chip de Favoritos si NO es administrador */}
-          {!esAdmin && (
-            <TouchableOpacity
-              style={[styles.chip, soloFavoritos && styles.chipActivo]}
-              onPress={() => setSoloFavoritos(!soloFavoritos)}
-            >
-              <Text
-                style={[styles.chipText, soloFavoritos && styles.chipTextActivo]}
-              >
-                ❤️ Favoritos
-              </Text>
-            </TouchableOpacity>
-          )}
-
           {categorias.map((cat) => (
             <TouchableOpacity
               key={cat}
@@ -272,7 +253,6 @@ export default function CatalogScreen({ navigation, sesion }) {
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F4F6FF" },
