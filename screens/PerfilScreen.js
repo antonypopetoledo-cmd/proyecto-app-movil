@@ -9,6 +9,8 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
+import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
 import { MaterialIcons } from "@expo/vector-icons";
 import { actualizarPerfil, cerrarSesion } from "../services/authService";
 import { INTERESES } from "../data/categorias";
@@ -18,6 +20,7 @@ export default function PerfilScreen({ sesion }) {
   const [nombre, setNombre] = useState(sesion?.nombre || "");
   const [apellido, setApellido] = useState(sesion?.apellido || "");
   const [intereses, setIntereses] = useState(sesion?.intereses || []);
+  const [foto, setFoto] = useState(sesion?.foto || "");
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
 
@@ -31,9 +34,10 @@ export default function PerfilScreen({ sesion }) {
     return (
       nombre.trim() !== (sesion?.nombre || "") ||
       apellido.trim() !== (sesion?.apellido || "") ||
+      foto !== (sesion?.foto || "") ||
       !mismosIntereses
     );
-  }, [nombre, apellido, intereses, sesion]);
+  }, [nombre, apellido, intereses, foto, sesion]);
 
   const iniciales =
     `${(sesion?.nombre || "?")[0]}${(sesion?.apellido || "")[0] || ""}`.toUpperCase();
@@ -42,6 +46,93 @@ export default function PerfilScreen({ sesion }) {
     setIntereses((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
+
+  // Solicita permiso de Cámara y toma una foto
+  const tomarFoto = async () => {
+    try {
+      const permiso = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permiso.granted) {
+        Alert.alert(
+          "Permiso requerido",
+          "Activa el permiso de cámara en la configuración de tu teléfono para tomar una foto de perfil.",
+        );
+        return;
+      }
+
+      const resultado = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.2,
+        base64: true,
+      });
+
+      if (!resultado.canceled && resultado.assets?.[0]) {
+        const asset = resultado.assets[0];
+        const imagenFinal = asset.base64
+          ? `data:image/jpeg;base64,${asset.base64}`
+          : asset.uri;
+        setFoto(imagenFinal);
+      }
+    } catch (e) {
+      Alert.alert("Cámara", "No se pudo abrir la cámara en este dispositivo.");
+    }
+  };
+
+  // Solicita permiso de Galería Multimedia y elige una imagen
+  const elegirDeGaleria = async () => {
+    try {
+      const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permiso.granted) {
+        Alert.alert(
+          "Permiso requerido",
+          "Activa el permiso de galería multimedia para elegir una foto de perfil.",
+        );
+        return;
+      }
+
+      const resultado = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.2,
+        base64: true,
+      });
+
+      if (!resultado.canceled && resultado.assets?.[0]) {
+        const asset = resultado.assets[0];
+        const imagenFinal = asset.base64
+          ? `data:image/jpeg;base64,${asset.base64}`
+          : asset.uri;
+        setFoto(imagenFinal);
+      }
+    } catch (e) {
+      Alert.alert("Galería", "No se pudo abrir la galería de imágenes.");
+    }
+  };
+
+  // Menú al tocar el avatar
+  const cambiarFotoPerfil = () => {
+    const opciones = [
+      { text: "Tomar foto (Cámara)", onPress: tomarFoto },
+      { text: "Elegir de galería", onPress: elegirDeGaleria },
+    ];
+
+    if (foto) {
+      opciones.push({
+        text: "Quitar foto",
+        style: "destructive",
+        onPress: () => setFoto(""),
+      });
+    }
+
+    opciones.push({ text: "Cancelar", style: "cancel" });
+
+    Alert.alert(
+      "Foto de perfil",
+      "Selecciona cómo deseas actualizar tu imagen",
+      opciones,
+    );
+  };
 
   const guardar = async () => {
     if (!nombre.trim() || !apellido.trim()) {
@@ -54,6 +145,7 @@ export default function PerfilScreen({ sesion }) {
       nombre: nombre.trim(),
       apellido: apellido.trim(),
       intereses,
+      foto,
     });
     setGuardando(false);
     if (!resultado.ok) {
@@ -86,9 +178,27 @@ export default function PerfilScreen({ sesion }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarTexto}>{iniciales}</Text>
-        </View>
+        <TouchableOpacity
+          style={styles.avatarWrapper}
+          onPress={cambiarFotoPerfil}
+          activeOpacity={0.85}
+        >
+          {foto ? (
+            <Image
+              source={{ uri: foto }}
+              style={styles.avatarImagen}
+              contentFit="cover"
+            />
+          ) : (
+            <View style={styles.avatar}>
+              <Text style={styles.avatarTexto}>{iniciales}</Text>
+            </View>
+          )}
+          <View style={styles.camaraBadge}>
+            <MaterialIcons name="photo-camera" size={16} color="#FFF" />
+          </View>
+        </TouchableOpacity>
+
         <Text style={styles.headerNombre}>
           {`${sesion?.nombre || ""} ${sesion?.apellido || ""}`.trim() ||
             "Mi perfil"}
@@ -200,14 +310,37 @@ const styles = StyleSheet.create({
     paddingBottom: 22,
     alignItems: "center",
   },
+  avatarWrapper: {
+    position: "relative",
+    marginBottom: 10,
+  },
   avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 78,
+    height: 78,
+    borderRadius: 39,
     backgroundColor: "#FFF",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 10,
+  },
+  avatarImagen: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+    borderWidth: 2,
+    borderColor: "#FFF",
+  },
+  camaraBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#222",
+    borderWidth: 2,
+    borderColor: "#FFF",
+    alignItems: "center",
+    justifyContent: "center",
   },
   avatarTexto: { fontSize: 26, fontWeight: "bold", color: "#5B4BDB" },
   headerNombre: { fontSize: 20, fontWeight: "bold", color: "#FFF" },
