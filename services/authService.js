@@ -8,9 +8,6 @@ import {
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "./firebaseConfig";
 
-// Cuenta de prueba: hay que crearla una vez desde el formulario de registro
-export const USUARIO_PRUEBA = { email: "jhon@gmail.com", password: "12345678" };
-
 const oyentes = new Set();
 let sesionActual = null;
 

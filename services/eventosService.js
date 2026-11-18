@@ -2,13 +2,46 @@ import { collection, deleteDoc, doc, getDocs, onSnapshot, updateDoc } from "fire
 import { db } from "./firebaseConfig";
 
 const eventosRef = collection(db, "eventos");
-const convertir = (documento) => ({ ...documento.data(), id: documento.id });
 const esAdmin = (sesion) => sesion?.rol === "administrador";
 
-export const getEventos = async () => (await getDocs(eventosRef)).docs.map(convertir);
+const convertir = (documento) => ({ ...documento.data(), id: documento.id });
+
+// Convierte cualquier formato de fecha (Timestamp de Firestore, texto ISO o Date) a milisegundos
+const obtenerTiempo = (fecha) => {
+  if (!fecha) return Infinity;
+  if (typeof fecha.toMillis === "function") return fecha.toMillis();
+  const tiempo = new Date(fecha).getTime();
+  return Number.isNaN(tiempo) ? Infinity : tiempo;
+};
+
+// Ordena los eventos por fechaInicio (más próximos primero) sin ocultar ninguno si le falta la fecha
+const ordenarPorFecha = (lista) => {
+  const ahora = Date.now();
+  return [...lista].sort((a, b) => {
+    const tiempoA = obtenerTiempo(a.fechaInicio);
+    const tiempoB = obtenerTiempo(b.fechaInicio);
+    const aPaso = tiempoA < ahora;
+    const bPaso = tiempoB < ahora;
+
+    // Pone siempre los eventos futuros antes que los eventos ya pasados
+    if (!aPaso && bPaso) return -1;
+    if (aPaso && !bPaso) return 1;
+    return tiempoA - tiempoB;
+  });
+};
+
+
+export const getEventos = async () => {
+  const snapshot = await getDocs(eventosRef);
+  return ordenarPorFecha(snapshot.docs.map(convertir));
+};
 
 export const suscribirEventos = (alCambiar, alError) =>
-  onSnapshot(eventosRef, (resultado) => alCambiar(resultado.docs.map(convertir)), alError);
+  onSnapshot(
+    eventosRef,
+    (resultado) => alCambiar(ordenarPorFecha(resultado.docs.map(convertir))),
+    alError
+  );
 
 export const editarEvento = async (id, datos, sesion) => {
   if (!esAdmin(sesion)) return { ok: false, mensaje: "No tienes permisos de administrador." };

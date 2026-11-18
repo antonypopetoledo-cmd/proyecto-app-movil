@@ -29,6 +29,40 @@ const CAMPOS_VACIOS = {
   descripcion: "",
 };
 
+function CampoTexto({
+  etiqueta,
+  valor,
+  onChangeText,
+  placeholder,
+  multilinea = false,
+  autoCapitalize = "sentences",
+  keyboardType = "default",
+  editable = true,
+  esUrl = false,
+}) {
+  const [enfocado, setEnfocado] = useState(false);
+
+  return (
+    <View>
+      <Text style={estilos.label}>{etiqueta}</Text>
+      <TextInput
+        style={[estilos.input, multilinea && estilos.inputMultilinea]}
+        placeholder={placeholder}
+        placeholderTextColor="#999"
+        value={valor}
+        onChangeText={onChangeText}
+        autoCapitalize={autoCapitalize}
+        keyboardType={keyboardType}
+        multiline={multilinea}
+        editable={editable}
+        onFocus={() => setEnfocado(true)}
+        onBlur={() => setEnfocado(false)}
+        selection={esUrl && !enfocado ? { start: 0, end: 0 } : undefined}
+      />
+    </View>
+  );
+}
+
 export default function PublicarScreen({ sesion, navigation }) {
   const { enviarSolicitud } = useSolicitudes(sesion);
   const [form, setForm] = useState(CAMPOS_VACIOS);
@@ -48,8 +82,8 @@ export default function PublicarScreen({ sesion, navigation }) {
     if (
       !form.titulo.trim() ||
       !form.categoria.trim() ||
-       !form.fecha.trim() ||
-       !form.hora.trim() ||
+      !form.fecha.trim() ||
+      !form.hora.trim() ||
       !form.lugar.trim()
     ) {
       setError("Nombre, categoría, fecha, hora y lugar son obligatorios.");
@@ -83,22 +117,6 @@ export default function PublicarScreen({ sesion, navigation }) {
     }
   };
 
-  const campo = (etiqueta, clave, opciones = {}) => (
-    <>
-      <Text style={estilos.label}>{etiqueta}</Text>
-      <TextInput
-        style={[estilos.input, opciones.multilinea && estilos.inputMultilinea]}
-        placeholder={opciones.placeholder}
-        placeholderTextColor="#999"
-        value={form[clave]}
-        onChangeText={cambiar(clave)}
-        autoCapitalize={opciones.autoCapitalize}
-        keyboardType={opciones.keyboardType}
-        multiline={opciones.multilinea}
-      />
-    </>
-  );
-
   return (
     <KeyboardAvoidingView
       style={estilos.contenedor}
@@ -117,9 +135,13 @@ export default function PublicarScreen({ sesion, navigation }) {
         contentContainerStyle={estilos.formulario}
         keyboardShouldPersistTaps="handled"
       >
-        {campo("Nombre del evento *", "titulo", {
-          placeholder: "Ej. Feria de Anime",
-        })}
+        <CampoTexto
+          etiqueta="Nombre del evento *"
+          valor={form.titulo}
+          onChangeText={cambiar("titulo")}
+          placeholder="Ej. Feria de Anime"
+          editable={!enviando}
+        />
 
         <Text style={estilos.label}>Categoría *</Text>
         <View style={estilos.categorias}>
@@ -131,6 +153,7 @@ export default function PublicarScreen({ sesion, navigation }) {
                 style={[estilos.chip, activa && estilos.chipActivo]}
                 onPress={() => cambiar("categoria")(item.label)}
                 activeOpacity={0.8}
+                disabled={enviando}
               >
                 <Text style={[estilos.chipTexto, activa && estilos.chipTextoActivo]}>
                   {item.label}
@@ -140,10 +163,16 @@ export default function PublicarScreen({ sesion, navigation }) {
           })}
         </View>
 
-        <>
+        <View>
           <Text style={estilos.label}>Fecha *</Text>
-          <TouchableOpacity style={estilos.input} onPress={() => setMostrarCalendario(true)}>
-            <Text>{form.fecha || "Seleccionar fecha"}</Text>
+          <TouchableOpacity
+            style={estilos.input}
+            onPress={() => setMostrarCalendario(true)}
+            disabled={enviando}
+          >
+            <Text style={{ color: form.fecha ? "#222" : "#999" }}>
+              {form.fecha || "Seleccionar fecha"}
+            </Text>
           </TouchableOpacity>
           {mostrarCalendario ? (
             <DateTimePicker
@@ -154,19 +183,26 @@ export default function PublicarScreen({ sesion, navigation }) {
                 setFechaCalendario(fecha);
                 setForm((prev) => ({
                   ...prev,
-                   fecha: formatearFecha(fecha),
-                   fechaInicio: crearFechaInicio(fecha, horaCalendario),
+                  fecha: formatearFecha(fecha),
+                  fechaInicio: crearFechaInicio(fecha, horaCalendario),
                 }));
                 setMostrarCalendario(false);
               }}
               onDismiss={() => setMostrarCalendario(false)}
             />
           ) : null}
-        </>
-        <>
+        </View>
+
+        <View>
           <Text style={estilos.label}>Hora *</Text>
-          <TouchableOpacity style={estilos.input} onPress={() => setMostrarReloj(true)}>
-            <Text>{form.hora || "Seleccionar hora"}</Text>
+          <TouchableOpacity
+            style={estilos.input}
+            onPress={() => setMostrarReloj(true)}
+            disabled={enviando}
+          >
+            <Text style={{ color: form.hora ? "#222" : "#999" }}>
+              {form.hora || "Seleccionar hora"}
+            </Text>
           </TouchableOpacity>
           {mostrarReloj ? (
             <DateTimePicker
@@ -186,28 +222,62 @@ export default function PublicarScreen({ sesion, navigation }) {
               onDismiss={() => setMostrarReloj(false)}
             />
           ) : null}
-        </>
-        {campo("Lugar *", "lugar", {
-          placeholder: "Ej. Costa 21, San Miguel",
-        })}
-        {campo("Precio", "precio", { placeholder: "Ej. Gratis, Desde S/ 20" })}
-        {campo("Organizador", "organizador", {
-          placeholder: "Ej. Live Nation Perú",
-        })}
-        {campo("Enlace oficial", "enlace", {
-          placeholder: "Escribir dirección del sitio web (opcional)",
-          autoCapitalize: "none",
-          keyboardType: "url",
-        })}
-        {campo("Imagen (enlace)", "imagen", {
-          placeholder: "Escribir dirección de la imagen (opcional)",
-          autoCapitalize: "none",
-          keyboardType: "url",
-        })}
-        {campo("Descripción", "descripcion", {
-          placeholder: "Cuéntanos de qué trata el evento",
-          multilinea: true,
-        })}
+        </View>
+
+        <CampoTexto
+          etiqueta="Lugar *"
+          valor={form.lugar}
+          onChangeText={cambiar("lugar")}
+          placeholder="Ej. Costa 21, San Miguel"
+          editable={!enviando}
+        />
+
+        <CampoTexto
+          etiqueta="Precio"
+          valor={form.precio}
+          onChangeText={cambiar("precio")}
+          placeholder="Ej. Gratis, Desde S/ 20"
+          editable={!enviando}
+        />
+
+        <CampoTexto
+          etiqueta="Organizador"
+          valor={form.organizador}
+          onChangeText={cambiar("organizador")}
+          placeholder="Ej. Live Nation Perú"
+          editable={!enviando}
+        />
+
+        <CampoTexto
+          etiqueta="Enlace oficial"
+          valor={form.enlace}
+          onChangeText={cambiar("enlace")}
+          placeholder="Escribir dirección del sitio web"
+          autoCapitalize="none"
+          keyboardType="url"
+          editable={!enviando}
+          esUrl={true}
+        />
+
+        <CampoTexto
+          etiqueta="Imagen (enlace)"
+          valor={form.imagen}
+          onChangeText={cambiar("imagen")}
+          placeholder="Escribir dirección de la imagen"
+          autoCapitalize="none"
+          keyboardType="url"
+          editable={!enviando}
+          esUrl={true}
+        />
+
+        <CampoTexto
+          etiqueta="Descripción"
+          valor={form.descripcion}
+          onChangeText={cambiar("descripcion")}
+          placeholder="Cuéntanos de qué trata el evento"
+          multilinea={true}
+          editable={!enviando}
+        />
 
         {error ? <Text style={estilos.error}>{error}</Text> : null}
 
@@ -252,26 +322,41 @@ const estilos = StyleSheet.create({
     marginBottom: 14,
   },
   chip: {
-    borderWidth: 1.5,
-    borderColor: "#DDD",
     backgroundColor: "#FFF",
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: "#DDD",
     borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
-  chipActivo: { backgroundColor: "#5B4BDB", borderColor: "#5B4BDB" },
-  chipTexto: { fontSize: 13, color: "#444", fontWeight: "600" },
-  chipTextoActivo: { color: "#FFF" },
-  error: { color: "#E53935", fontSize: 13, marginBottom: 10 },
+  chipActivo: {
+    backgroundColor: "#5B4BDB",
+    borderColor: "#5B4BDB",
+  },
+  chipTexto: {
+    fontSize: 13,
+    color: "#444",
+    fontWeight: "500",
+  },
+  chipTextoActivo: {
+    color: "#FFF",
+    fontWeight: "600",
+  },
+  error: {
+    color: "#D32F2F",
+    fontSize: 13,
+    marginBottom: 12,
+    textAlign: "center",
+  },
   boton: {
     backgroundColor: "#5B4BDB",
+    borderRadius: 12,
     paddingVertical: 15,
-    borderRadius: 10,
-    marginTop: 4,
+    alignItems: "center",
+    marginTop: 6,
   },
   botonTexto: {
     color: "#FFF",
-    textAlign: "center",
     fontSize: 16,
     fontWeight: "bold",
   },
