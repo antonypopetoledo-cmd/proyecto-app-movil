@@ -14,6 +14,7 @@ import {
   iniciarSesionConCuenta,
   recuperarContrasena,
 } from "../services/authService";
+import { enviarCorreoBienvenida } from "../services/emailService";
 import { MaterialIcons } from "@expo/vector-icons";
 
 const REGEX_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -67,20 +68,20 @@ export default function LoginScreen() {
     }
     setError("");
     setCargando(true);
-    const resultado = await registrarUsuario({
-      nombre,
-      apellido,
-      email,
-      password,
-    });
-    setCargando(false);
+    const resultado = await registrarUsuario({ nombre, apellido, email, password });
+        setCargando(false);
     if (!resultado.ok) {
       setError(resultado.mensaje);
       return;
     }
+    enviarCorreoBienvenida({
+      nombre: resultado.sesion.nombre,
+      apellido: resultado.sesion.apellido,
+      email: resultado.sesion.email,
+    });
     Alert.alert(
       "Bienvenido a LimaGo",
-      "Tu cuenta ha sido creada exitosamente.",
+      "Tu cuenta ha sido creada exitosamente. Te enviamos un correo de confirmación.",
     );
   };
 
