@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Image } from "expo-image";
 import { MaterialIcons } from "@expo/vector-icons";
 import { editarEvento } from "../services/eventosService";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -37,6 +38,7 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
     fecha: evento.fecha || "",
     hora: evento.hora || "",
     fechaInicio: evento.fechaInicio || "",
+    posicion: evento.posicion || "center",
   });
   const [fecha, setFecha] = useState(inicio);
   const [hora, setHora] = useState(inicio);
@@ -69,6 +71,7 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
       fecha: form.fecha,
       hora: form.hora,
       fechaInicio: form.fechaInicio,
+      posicion: form.posicion || "center",
     };
     const resultado = await editarEvento(evento.id, cambios, sesion);
     setGuardando(false);
@@ -130,6 +133,50 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
                     : undefined
                 }
               />
+
+              {/* Vista previa y ajuste de encuadre debajo del campo imagen */}
+              {campo === "imagen" && form.imagen?.trim() ? (
+                <View style={estilos.encuadreBox}>
+                  <Image
+                    source={{ uri: form.imagen.trim() }}
+                    style={estilos.vistaPreviaImagen}
+                    contentFit="cover"
+                    contentPosition={form.posicion || "center"}
+                  />
+                  <Text style={estilos.encuadreTitulo}>
+                    Encuadre en tarjeta del catálogo:
+                  </Text>
+                  <View style={estilos.encuadreFila}>
+                    {[
+                      { id: "top", label: "Arriba" },
+                      { id: "center", label: "Centro" },
+                      { id: "bottom", label: "Abajo" },
+                    ].map((op) => {
+                      const activo = (form.posicion || "center") === op.id;
+                      return (
+                        <TouchableOpacity
+                          key={op.id}
+                          style={[
+                            estilos.encuadreBtn,
+                            activo && estilos.encuadreBtnActivo,
+                          ]}
+                          onPress={() => cambiar("posicion", op.id)}
+                          disabled={guardando}
+                        >
+                          <Text
+                            style={[
+                              estilos.encuadreBtnTexto,
+                              activo && estilos.encuadreBtnTextoActivo,
+                            ]}
+                          >
+                            {op.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : null}
             </View>
           );
         })}
@@ -243,4 +290,44 @@ const estilos = StyleSheet.create({
     marginTop: 8,
   },
   botonTexto: { color: "#FFF", textAlign: "center", fontWeight: "bold" },
+    vistaPreviaImagen: {
+    width: "100%",
+    height: 160,
+    borderRadius: 10,
+    marginBottom: 8,
+  },
+  encuadreBox: {
+    marginBottom: 14,
+  },
+  encuadreTitulo: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#555",
+    marginBottom: 6,
+  },
+  encuadreFila: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  encuadreBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#DDD",
+    backgroundColor: "#FFF",
+    alignItems: "center",
+  },
+  encuadreBtnActivo: {
+    backgroundColor: "#5B4BDB",
+    borderColor: "#5B4BDB",
+  },
+  encuadreBtnTexto: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#444",
+  },
+  encuadreBtnTextoActivo: {
+    color: "#FFF",
+  },
 });
