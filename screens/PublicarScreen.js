@@ -10,8 +10,12 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
+import { MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import useSolicitudes from "../hooks/useSolicitudes";
+import { validarImagenEvento } from "../services/solicitudesService";
 import { INTERESES } from "../data/categorias";
 import { crearFechaInicio, formatearFecha, formatearHora } from "../utils/fechaEvento";
 
@@ -25,7 +29,6 @@ const CAMPOS_VACIOS = {
   precio: "",
   organizador: "",
   enlace: "",
-  imagen: "",
   descripcion: "",
 };
 
@@ -46,7 +49,11 @@ function CampoTexto({
     <View>
       <Text style={estilos.label}>{etiqueta}</Text>
       <TextInput
-        style={[estilos.input, multilinea && estilos.inputMultilinea]}
+        style={[
+          estilos.input,
+          multilinea && estilos.inputMultilinea,
+          !editable && estilos.inputBloqueado,
+        ]}
         placeholder={placeholder}
         placeholderTextColor="#999"
         value={valor}
@@ -63,9 +70,21 @@ function CampoTexto({
   );
 }
 
+// Convierte el resultado del selector en "data:image/jpeg;base64,..."
+// (mismo formato que usa la foto de perfil). Si no hay base64 devuelve "",
+// porque una ruta local del teléfono no serviría para otros usuarios.
+const imagenDesdeResultado = (resultado) => {
+  if (resultado.canceled || !resultado.assets?.[0]) return null;
+  const { base64 } = resultado.assets[0];
+  return base64 ? `data:image/jpeg;base64,${base64}` : "";
+};
+
 export default function PublicarScreen({ sesion, navigation }) {
   const { enviarSolicitud } = useSolicitudes(sesion);
   const [form, setForm] = useState(CAMPOS_VACIOS);
+  const [imagenArchivo, setImagenArchivo] = useState("");
+  const [imagenEnlace, setImagenEnlace] = useState("");
+  const [errorVistaPrevia, setErrorVistaPrevia] = useState(false);
   const [error, setError] = useState("");
   const [mostrarCalendario, setMostrarCalendario] = useState(false);
   const [mostrarReloj, setMostrarReloj] = useState(false);
@@ -75,8 +94,90 @@ export default function PublicarScreen({ sesion, navigation }) {
 
   const esAdmin = sesion?.rol === "administrador";
 
+  // Lo que se ve en la vista previa: primero el archivo elegido y, si no hay,
+  // el enlace (solo cuando ya parece una dirección válida).
+  const enlaceLimpio = imagenEnlace.trim();
+  const imagenVista =
+    imagenArchivo || (/^https?:\/\//i.test(enlaceLimpio) ? enlaceLimpio : "");
+
   const cambiar = (campo) => (texto) =>
     setForm((prev) => ({ ...prev, [campo]: texto }));
+
+  const cambiarEnlaceImagen = (texto) => {
+    setImagenEnlace(texto);
+    setErrorVistaPrevia(false);
+  };
+
+  // Guarda la imagen elegida revisando que no sea demasiado pesada
+  const aceptarImagen = (imagen) => {
+    if (imagen === null) return; // el usuario canceló
+    if (!imagen) {
+      Alert.alert("Imagen", "No se pudo leer la imagen seleccionada. Prueba con otra.");
+      return;
+    }
+    const problema = validarImagenEvento(imagen);
+    if (problema) {
+      Alert.alert("Imagen", problema);
+      return;
+    }
+    setImagenArchivo(imagen);
+    setImagenEnlace("");
+    setErrorVistaPrevia(false);
+    setError("");
+  };
+
+  const tomarFoto = async () => {
+    try {
+      const permiso = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permiso.granted) {
+        Alert.alert(
+          "Permiso requerido",
+          "Activa el permiso de cámara en la configuración de tu teléfono para tomar la foto del evento."
+        );
+        return;
+      }
+      const resultado = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.3,
+        base64: true,
+      });
+      aceptarImagen(imagenDesdeResultado(resultado));
+    } catch (e) {
+      Alert.alert("Cámara", "No se pudo abrir la cámara en este dispositivo.");
+    }
+  };
+
+  // El selector de galería del sistema no necesita pedir permiso antes
+  // (ver docs de expo-image-picker), así que se abre directamente.
+  const elegirDeGaleria = async () => {
+    try {
+      const resultado = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.3,
+        base64: true,
+      });
+      aceptarImagen(imagenDesdeResultado(resultado));
+    } catch (e) {
+      Alert.alert("Galería", "No se pudo abrir la galería de imágenes.");
+    }
+  };
+
+  const seleccionarImagen = () => {
+    Alert.alert("Imagen del evento", "Elige cómo quieres agregar el flyer", [
+      { text: "Tomar foto (Cámara)", onPress: tomarFoto },
+      { text: "Elegir de galería", onPress: elegirDeGaleria },
+      { text: "Cancelar", style: "cancel" },
+    ]);
+  };
+
+  const quitarImagen = () => {
+    setImagenArchivo("");
+    setImagenEnlace("");
+    setErrorVistaPrevia(false);
+  };
 
   const enviar = async () => {
     if (
@@ -93,8 +194,11 @@ export default function PublicarScreen({ sesion, navigation }) {
       setError("El enlace debe empezar con http:// o https://");
       return;
     }
-    if (form.imagen.trim() && !/^https?:\/\//i.test(form.imagen.trim())) {
-      setError("La imagen debe ser un enlace que empiece con http:// o https://");
+    // El archivo elegido tiene prioridad; el enlace es la opción secundaria
+    const imagenFinal = imagenArchivo || enlaceLimpio;
+    const problemaImagen = validarImagenEvento(imagenFinal);
+    if (problemaImagen) {
+      setError(problemaImagen);
       return;
     }
 
@@ -102,8 +206,9 @@ export default function PublicarScreen({ sesion, navigation }) {
     if (enviando) return;
     setEnviando(true);
     try {
-      await enviarSolicitud(form);
+      await enviarSolicitud({ ...form, imagen: imagenFinal });
       setForm(CAMPOS_VACIOS);
+      quitarImagen();
       Alert.alert(
         esAdmin ? "Evento publicado" : "Solicitud enviada",
         esAdmin
@@ -259,14 +364,58 @@ export default function PublicarScreen({ sesion, navigation }) {
           esUrl={true}
         />
 
+        {/* Imagen del evento: botón principal (cámara/galería) + enlace secundario */}
+        <Text style={estilos.label}>Imagen del evento</Text>
+        <TouchableOpacity
+          style={estilos.botonImagen}
+          onPress={seleccionarImagen}
+          activeOpacity={0.8}
+          disabled={enviando}
+        >
+          <MaterialIcons name="add-photo-alternate" size={22} color="#5B4BDB" />
+          <Text style={estilos.botonImagenTexto}>Seleccionar imagen del evento</Text>
+        </TouchableOpacity>
+
+        {imagenVista ? (
+          <View style={estilos.previewContenedor}>
+            {errorVistaPrevia ? (
+              <View style={[estilos.preview, estilos.previewError]}>
+                <MaterialIcons name="broken-image" size={32} color="#999" />
+                <Text style={estilos.previewErrorTexto}>
+                  No se pudo cargar la imagen de ese enlace
+                </Text>
+              </View>
+            ) : (
+              <Image
+                source={{ uri: imagenVista }}
+                style={estilos.preview}
+                contentFit="cover"
+                transition={200}
+                onError={() => setErrorVistaPrevia(true)}
+              />
+            )}
+            <TouchableOpacity
+              style={estilos.botonQuitar}
+              onPress={quitarImagen}
+              activeOpacity={0.8}
+              disabled={enviando}
+            >
+              <MaterialIcons name="close" size={18} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
+        <Text style={estilos.separador}>
+          {imagenArchivo ? "Quita la imagen para usar un enlace" : "o usa un enlace (opcional)"}
+        </Text>
         <CampoTexto
           etiqueta="Imagen (enlace)"
-          valor={form.imagen}
-          onChangeText={cambiar("imagen")}
+          valor={imagenEnlace}
+          onChangeText={cambiarEnlaceImagen}
           placeholder="Escribir dirección de la imagen"
           autoCapitalize="none"
           keyboardType="url"
-          editable={!enviando}
+          editable={!enviando && !imagenArchivo}
           esUrl={true}
         />
 
@@ -315,6 +464,7 @@ const estilos = StyleSheet.create({
     color: "#222",
   },
   inputMultilinea: { minHeight: 90, textAlignVertical: "top" },
+  inputBloqueado: { backgroundColor: "#EEE", color: "#777" },
   categorias: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -341,6 +491,60 @@ const estilos = StyleSheet.create({
   chipTextoActivo: {
     color: "#FFF",
     fontWeight: "600",
+  },
+  botonImagen: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "#5B4BDB",
+    borderStyle: "dashed",
+    backgroundColor: "#FFF",
+    marginBottom: 12,
+  },
+  botonImagenTexto: {
+    color: "#5B4BDB",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  previewContenedor: {
+    position: "relative",
+    marginBottom: 12,
+  },
+  preview: {
+    width: "100%",
+    height: 200,
+    borderRadius: 12,
+    backgroundColor: "#E8E8F0",
+  },
+  previewError: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  previewErrorTexto: {
+    color: "#777",
+    fontSize: 13,
+  },
+  botonQuitar: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  separador: {
+    fontSize: 12,
+    color: "#777",
+    textAlign: "center",
+    marginBottom: 8,
   },
   error: {
     color: "#D32F2F",

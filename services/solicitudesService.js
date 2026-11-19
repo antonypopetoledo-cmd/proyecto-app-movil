@@ -10,6 +10,23 @@ const convertir = (documento) => ({ ...documento.data(), id: documento.id });
 const esAdmin = (sesion) => sesion?.rol === "administrador";
 const tieneSesion = (sesion) => Boolean(sesion?.uid);
 
+export const LIMITE_IMAGEN_CARACTERES = 700000;
+
+const esImagenArchivo = (valor) => /^data:image\/[a-z0-9.+-]+;base64,/i.test(valor);
+const esEnlaceHttp = (valor) => /^https?:\/\//i.test(valor);
+
+export const validarImagenEvento = (imagen) => {
+  const valor = typeof imagen === "string" ? imagen.trim() : "";
+  if (!valor) return null;
+  if (esImagenArchivo(valor)) {
+    return valor.length > LIMITE_IMAGEN_CARACTERES
+      ? "La imagen es muy pesada. Elige otra de menor tamaño."
+      : null;
+  }
+  if (esEnlaceHttp(valor)) return null;
+  return "La imagen debe ser un archivo seleccionado o un enlace que empiece con http:// o https://";
+};
+
 export const suscribirSolicitudes = (sesion, alCambiar, alError) => {
   if (!tieneSesion(sesion)) return () => {};
   const consulta = esAdmin(sesion)
@@ -20,10 +37,14 @@ export const suscribirSolicitudes = (sesion, alCambiar, alError) => {
 
 export const enviarSolicitud = async (datos, sesion) => {
   if (!tieneSesion(sesion)) throw new Error("Debes iniciar sesión para publicar.");
+  const imagen = typeof datos.imagen === "string" ? datos.imagen.trim() : "";
+  const errorImagen = validarImagenEvento(imagen);
+  if (errorImagen) throw new Error(errorImagen);
   const referencia = doc(solicitudesRef);
   const admin = esAdmin(sesion);
   const solicitud = {
     ...datos,
+    imagen,
     titulo: datos.titulo.trim(),
     creador: sesion.email,
     creadorUid: sesion.uid,
@@ -34,7 +55,7 @@ export const enviarSolicitud = async (datos, sesion) => {
   if (admin) {
     await runTransaction(db, async (transaccion) => {
       transaccion.set(referencia, solicitud);
-      transaccion.set(doc(eventosRef, referencia.id), { ...datos, titulo: solicitud.titulo, creadorUid: sesion.uid, creadoEn: serverTimestamp() });
+      transaccion.set(doc(eventosRef, referencia.id), { ...datos, imagen, titulo: solicitud.titulo, creadorUid: sesion.uid, creadoEn: serverTimestamp() });
     });
   } else {
     await setDoc(referencia, solicitud);
