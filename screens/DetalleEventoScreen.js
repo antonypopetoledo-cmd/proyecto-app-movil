@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   View,
   Text,
   ScrollView,
@@ -9,12 +10,18 @@ import {
   Linking,
 } from "react-native";
 import { Image } from "expo-image";
+import * as Location from "expo-location";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { eliminarEvento } from "../services/eventosService";
 import { registrarAsistencia } from "../services/asistenciasService";
 import { enviarCorreoConfirmacion } from "../services/emailService";
 import useFavoritos from "../hooks/useFavoritos";
+import {
+  calcularDistanciaMetros,
+  coordenadasValidas,
+  formatearDistancia,
+} from "../utils/distanciaUbicacion";
 
 // Fila con icono + etiqueta y su valor debajo
 const Dato = ({ icono, etiqueta, children }) => (
@@ -32,6 +39,10 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
   const esSolicitud = route.params.esSolicitud === true;
   const [recordatorioEnviado, setRecordatorioEnviado] = useState(false);
   const [procesando, setProcesando] = useState(false);
+  const [distancia, setDistancia] = useState(null);
+  const [ubicacionActual, setUbicacionActual] = useState(null);
+  const [coordenadasEvento, setCoordenadasEvento] = useState(null);
+  const [cargandoDistancia, setCargandoDistancia] = useState(false);
   const { favoritos, alternarFavorito } = useFavoritos(sesion?.uid);
   const esFavorito = favoritos.includes(evento.id);
 
@@ -49,6 +60,72 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
   const puedeGestionar = esAdmin && !esSolicitud;
   // "Recordarme" solo para usuarios y solo en eventos ya publicados (no en solicitudes pendientes)
   const puedeGuardarRecordatorio = !esAdmin && !esSolicitud;
+
+  const obtenerCoordenadasEvento = async () => {
+    if (!evento.lugar?.trim()) return null;
+    try {
+      const resultados = await Location.geocodeAsync(evento.lugar.trim());
+      const coordenadas = resultados[0]
+        ? {
+            latitude: resultados[0].latitude,
+            longitude: resultados[0].longitude,
+          }
+        : null;
+      if (coordenadasValidas(coordenadas)) {
+        setCoordenadasEvento(coordenadas);
+        return coordenadas;
+      }
+    } catch (e) {
+      return null;
+    }
+    return null;
+  };
+
+  const actualizarDistancia = async (posicion = null) => {
+    const ubicacion = posicion || ubicacionActual;
+    if (!ubicacion) return;
+
+    setCargandoDistancia(true);
+    try {
+      const destino = coordenadasEvento || (await obtenerCoordenadasEvento());
+      const metros = calcularDistanciaMetros(ubicacion, destino);
+      setDistancia(metros);
+    } catch (e) {
+      setDistancia(null);
+    } finally {
+      setCargandoDistancia(false);
+    }
+  };
+
+  useEffect(() => {
+    let activo = true;
+
+    const cargarDistanciaSiTienePermiso = async () => {
+      try {
+        const permiso = await Location.getForegroundPermissionsAsync();
+        if (!activo || !permiso.granted) return;
+
+        const posicion = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        if (!activo) return;
+
+        const coordenadas = {
+          latitude: posicion.coords.latitude,
+          longitude: posicion.coords.longitude,
+        };
+        setUbicacionActual(coordenadas);
+        await actualizarDistancia(coordenadas);
+      } catch (e) {
+        if (activo) setDistancia(null);
+      }
+    };
+
+    cargarDistanciaSiTienePermiso();
+    return () => {
+      activo = false;
+    };
+  }, [evento.id, evento.lugar]);
 
   // registrarAsistencia (Firestore) devuelve true si creó el registro y false si ya existía.
   // El correo de recordatorio se envía solo en el primer registro.
@@ -79,11 +156,80 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
     }
   };
 
-  const abrirMapa = () => {
-    const query = encodeURIComponent(evento.lugar);
-    Linking.openURL(
-      `https://www.google.com/maps/search/?api=1&query=${query}`,
-    ).catch(() => Alert.alert("No se pudo abrir el mapa"));
+  const abrirMapa = async () => {
+    let permiso;
+    try {
+      permiso = await Location.requestForegroundPermissionsAsync();
+    } catch (e) {
+      Alert.alert(
+        "Permiso de ubicación",
+        "No se pudo solicitar el permiso de ubicación.",
+      );
+      return;
+    }
+
+    if (!permiso.granted) {
+      Alert.alert(
+        "Permiso de ubicación",
+        "Necesitamos tu ubicación para mostrar la ruta hasta el evento.",
+      );
+      return;
+    }
+
+    try {
+      const serviciosActivos = await Location.hasServicesEnabledAsync();
+      if (!serviciosActivos) {
+        Alert.alert(
+          "Ubicación desactivada",
+          "Activa la ubicación del emulador o del teléfono y vuelve a intentarlo.",
+        );
+        return;
+      }
+    } catch (e) {
+      Alert.alert(
+        "No se pudo comprobar la ubicación",
+        "Verifica que la ubicación del dispositivo esté activa.",
+      );
+      return;
+    }
+
+    let origen;
+    try {
+      const posicion = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      origen = {
+        latitude: posicion.coords.latitude,
+        longitude: posicion.coords.longitude,
+      };
+      setUbicacionActual(origen);
+    } catch (e) {
+      Alert.alert(
+        "No se pudo obtener tu ubicación",
+        "Configura una ubicación en el emulador o activa el GPS del dispositivo.",
+      );
+      return;
+    }
+
+    const destino = coordenadasEvento || (await obtenerCoordenadasEvento());
+    setDistancia(destino ? calcularDistanciaMetros(origen, destino) : null);
+
+    const origenTexto = encodeURIComponent(`${origen.latitude},${origen.longitude}`);
+    const destinoTexto = encodeURIComponent(
+      destino ? `${destino.latitude},${destino.longitude}` : evento.lugar,
+    );
+    const urlMapa =
+      `https://www.google.com/maps/dir/?api=1&origin=${origenTexto}` +
+      `&destination=${destinoTexto}&travelmode=driving`;
+
+    try {
+      await Linking.openURL(urlMapa);
+    } catch (e) {
+      Alert.alert(
+        "No se pudo abrir Google Maps",
+        "Instala Google Maps o verifica tu conexión e inténtalo nuevamente.",
+      );
+    }
   };
 
   const abrirEnlace = () => {
@@ -183,9 +329,23 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
             {evento.hora ? ` · ${evento.hora}` : ""}
           </Dato>
 
-          <Dato icono="place" etiqueta="Lugar">
-            {evento.lugar}
-          </Dato>
+           <Dato icono="place" etiqueta="Lugar">
+             {evento.lugar}
+           </Dato>
+
+          {cargandoDistancia ? (
+            <View style={styles.distanciaFila}>
+              <ActivityIndicator size="small" color="#5B4BDB" />
+              <Text style={styles.distanciaTexto}>Calculando distancia...</Text>
+            </View>
+          ) : distancia !== null ? (
+            <View style={styles.distanciaFila}>
+              <MaterialIcons name="near-me" size={17} color="#5B4BDB" />
+              <Text style={styles.distanciaTexto}>
+                A {formatearDistancia(distancia)} de ti
+              </Text>
+            </View>
+          ) : null}
 
           {evento.organizador ? (
             <Dato icono="mic" etiqueta="Organizador">
@@ -309,6 +469,13 @@ const styles = StyleSheet.create({
   },
   label: { fontSize: 13, color: "#777" },
   valor: { fontSize: 16, color: "#222", marginTop: 4, lineHeight: 22 },
+  distanciaFila: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 12,
+  },
+  distanciaTexto: { color: "#5B4BDB", fontSize: 14, fontWeight: "700" },
   pie: {
     padding: 16,
     gap: 10,
