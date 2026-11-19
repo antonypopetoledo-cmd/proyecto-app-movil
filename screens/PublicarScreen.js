@@ -17,7 +17,11 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import useSolicitudes from "../hooks/useSolicitudes";
 import { validarImagenEvento } from "../services/solicitudesService";
 import { INTERESES } from "../data/categorias";
-import { crearFechaInicio, formatearFecha, formatearHora } from "../utils/fechaEvento";
+import {
+  crearFechaInicio,
+  formatearFecha,
+  formatearHora,
+} from "../utils/fechaEvento";
 
 const CAMPOS_VACIOS = {
   titulo: "",
@@ -30,6 +34,7 @@ const CAMPOS_VACIOS = {
   organizador: "",
   enlace: "",
   descripcion: "",
+  posicion: "center",
 };
 
 function CampoTexto({
@@ -112,7 +117,10 @@ export default function PublicarScreen({ sesion, navigation }) {
   const aceptarImagen = (imagen) => {
     if (imagen === null) return; // el usuario canceló
     if (!imagen) {
-      Alert.alert("Imagen", "No se pudo leer la imagen seleccionada. Prueba con otra.");
+      Alert.alert(
+        "Imagen",
+        "No se pudo leer la imagen seleccionada. Prueba con otra.",
+      );
       return;
     }
     const problema = validarImagenEvento(imagen);
@@ -132,7 +140,7 @@ export default function PublicarScreen({ sesion, navigation }) {
       if (!permiso.granted) {
         Alert.alert(
           "Permiso requerido",
-          "Activa el permiso de cámara en la configuración de tu teléfono para tomar la foto del evento."
+          "Activa el permiso de cámara en la configuración de tu teléfono para tomar la foto del evento.",
         );
         return;
       }
@@ -213,10 +221,12 @@ export default function PublicarScreen({ sesion, navigation }) {
         esAdmin ? "Evento publicado" : "Solicitud enviada",
         esAdmin
           ? "Tu evento ya aparece en la pestaña Eventos."
-          : "Tu evento quedó pendiente de revisión. Si es aceptado, aparecerá en la pestaña Eventos."
+          : "Tu evento quedó pendiente de revisión. Si es aceptado, aparecerá en la pestaña Eventos.",
       );
     } catch (e) {
-      setError("No se pudo enviar la solicitud. Revisa tu conexión e inténtalo otra vez.");
+      setError(
+        "No se pudo enviar la solicitud. Revisa tu conexión e inténtalo otra vez.",
+      );
     } finally {
       setEnviando(false);
     }
@@ -260,7 +270,9 @@ export default function PublicarScreen({ sesion, navigation }) {
                 activeOpacity={0.8}
                 disabled={enviando}
               >
-                <Text style={[estilos.chipTexto, activa && estilos.chipTextoActivo]}>
+                <Text
+                  style={[estilos.chipTexto, activa && estilos.chipTextoActivo]}
+                >
                   {item.label}
                 </Text>
               </TouchableOpacity>
@@ -373,7 +385,9 @@ export default function PublicarScreen({ sesion, navigation }) {
           disabled={enviando}
         >
           <MaterialIcons name="add-photo-alternate" size={22} color="#5B4BDB" />
-          <Text style={estilos.botonImagenTexto}>Seleccionar imagen del evento</Text>
+          <Text style={estilos.botonImagenTexto}>
+            Seleccionar imagen del evento
+          </Text>
         </TouchableOpacity>
 
         {imagenVista ? (
@@ -388,12 +402,13 @@ export default function PublicarScreen({ sesion, navigation }) {
             ) : (
               <Image
                 source={{ uri: imagenVista }}
-                style={estilos.preview}
+                style={estilos.vistaPreviaImagen}
                 contentFit="cover"
-                transition={200}
+                contentPosition={form.posicion || "center"}
                 onError={() => setErrorVistaPrevia(true)}
               />
             )}
+
             <TouchableOpacity
               style={estilos.botonQuitar}
               onPress={quitarImagen}
@@ -402,11 +417,51 @@ export default function PublicarScreen({ sesion, navigation }) {
             >
               <MaterialIcons name="close" size={18} color="#FFF" />
             </TouchableOpacity>
+
+            {/* Botones de ajuste de encuadre (solo si la imagen cargó bien) */}
+            {!errorVistaPrevia && (
+              <View style={estilos.encuadreBox}>
+                <Text style={estilos.encuadreTitulo}>
+                  Encuadre en tarjeta del catálogo:
+                </Text>
+                <View style={estilos.encuadreFila}>
+                  {[
+                    { id: "top", label: "Arriba" },
+                    { id: "center", label: "Centro" },
+                    { id: "bottom", label: "Abajo" },
+                  ].map((op) => {
+                    const activo = (form.posicion || "center") === op.id;
+                    return (
+                      <TouchableOpacity
+                        key={op.id}
+                        style={[
+                          estilos.encuadreBtn,
+                          activo && estilos.encuadreBtnActivo,
+                        ]}
+                        onPress={() => cambiar("posicion")(op.id)}
+                        disabled={enviando}
+                      >
+                        <Text
+                          style={[
+                            estilos.encuadreBtnTexto,
+                            activo && estilos.encuadreBtnTextoActivo,
+                          ]}
+                        >
+                          {op.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
           </View>
         ) : null}
 
         <Text style={estilos.separador}>
-          {imagenArchivo ? "Quita la imagen para usar un enlace" : "o usa un enlace (opcional)"}
+          {imagenArchivo
+            ? "Quita la imagen para usar un enlace"
+            : "o usa un enlace (opcional)"}
         </Text>
         <CampoTexto
           etiqueta="Imagen (enlace)"
@@ -437,7 +492,11 @@ export default function PublicarScreen({ sesion, navigation }) {
           disabled={enviando}
         >
           <Text style={estilos.botonTexto}>
-            {enviando ? "Guardando..." : esAdmin ? "Publicar evento" : "Enviar solicitud"}
+            {enviando
+              ? "Guardando..."
+              : esAdmin
+                ? "Publicar evento"
+                : "Enviar solicitud"}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -563,5 +622,45 @@ const estilos = StyleSheet.create({
     color: "#FFF",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  vistaPreviaImagen: {
+    width: "100%",
+    height: 160,
+    borderRadius: 12,
+  },
+  encuadreBox: {
+    marginTop: 10,
+    marginBottom: 14,
+  },
+  encuadreTitulo: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#555",
+    marginBottom: 6,
+  },
+  encuadreFila: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  encuadreBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#DDD",
+    backgroundColor: "#FFF",
+    alignItems: "center",
+  },
+  encuadreBtnActivo: {
+    backgroundColor: "#5B4BDB",
+    borderColor: "#5B4BDB",
+  },
+  encuadreBtnTexto: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#444",
+  },
+  encuadreBtnTextoActivo: {
+    color: "#FFF",
   },
 });
