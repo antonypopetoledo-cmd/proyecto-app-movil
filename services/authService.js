@@ -52,6 +52,7 @@ const cargarSesion = async (user) => {
     email: user.email,
     nombre: datos.nombre || "",
     apellido: datos.apellido || "",
+    foto: datos.foto || "",
     rol,
     intereses: datos.intereses || [],
     // el administrador no pasa por la pantalla de intereses
@@ -59,6 +60,7 @@ const cargarSesion = async (user) => {
   };
   return sesionActual;
 };
+
 
 const esperarAuth = () =>
   auth.authStateReady
