@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import {
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,9 +11,12 @@ import {
   View,
 } from "react-native";
 import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
 import { MaterialIcons } from "@expo/vector-icons";
-import { editarEvento } from "../services/eventosService";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { editarEvento } from "../services/eventosService";
+import { validarImagenEvento } from "../services/solicitudesService";
+import { INTERESES } from "../data/categorias";
 import {
   crearFechaInicio,
   fechaDesdeInicio,
@@ -19,27 +24,41 @@ import {
   formatearHora,
 } from "../utils/fechaEvento";
 
-const CAMPOS = [
-  "titulo",
-  "categoria",
-  "lugar",
-  "precio",
-  "organizador",
-  "enlace",
-  "imagen",
-  "descripcion",
-];
+const esBase64 = (valor) => /^data:image\/[a-z0-9.+-]+;base64,/i.test(valor || "");
+
+const imagenDesdeResultado = (resultado) => {
+  if (resultado.canceled || !resultado.assets?.length) return null;
+  const asset = resultado.assets.at(0);
+  return asset?.base64 ? `data:image/jpeg;base64,${asset.base64}` : "";
+};
 
 export default function EditarEventoScreen({ route, navigation, sesion }) {
   const evento = route.params.evento;
   const inicio = fechaDesdeInicio(evento.fechaInicio);
+  const imagenInicial = evento.imagen || "";
+
   const [form, setForm] = useState({
-    ...Object.fromEntries(CAMPOS.map((campo) => [campo, evento[campo] || ""])),
+    titulo: evento.titulo || "",
+    categoria: evento.categoria || "",
     fecha: evento.fecha || "",
     hora: evento.hora || "",
     fechaInicio: evento.fechaInicio || "",
+    lugar: evento.lugar || "",
+    precio: evento.precio || "",
+    organizador: evento.organizador || "",
+    enlace: evento.enlace || "",
+    descripcion: evento.descripcion || "",
     posicion: evento.posicion || "center",
   });
+
+  const [imagenArchivo, setImagenArchivo] = useState(
+    esBase64(imagenInicial) ? imagenInicial : ""
+  );
+  const [imagenEnlace, setImagenEnlace] = useState(
+    !esBase64(imagenInicial) ? imagenInicial : ""
+  );
+  const [errorVistaPrevia, setErrorVistaPrevia] = useState(false);
+
   const [fecha, setFecha] = useState(inicio);
   const [hora, setHora] = useState(inicio);
   const [mostrarFecha, setMostrarFecha] = useState(false);
@@ -47,8 +66,82 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
   const [guardando, setGuardando] = useState(false);
   const [campoActivo, setCampoActivo] = useState(null);
 
+  const enlaceLimpio = imagenEnlace.trim();
+  const imagenVista =
+    imagenArchivo || (/^https?:\/\//i.test(enlaceLimpio) ? enlaceLimpio : "");
+
   const cambiar = (campo, valor) =>
     setForm((anterior) => ({ ...anterior, [campo]: valor }));
+
+  const cambiarEnlaceImagen = (texto) => {
+    setImagenEnlace(texto);
+    setErrorVistaPrevia(false);
+  };
+
+  const aceptarImagen = (imagen) => {
+    if (imagen === null) return;
+    if (!imagen) {
+      Alert.alert("Imagen", "No se pudo leer la imagen seleccionada.");
+      return;
+    }
+    const problema = validarImagenEvento(imagen);
+    if (problema) {
+      Alert.alert("Imagen", problema);
+      return;
+    }
+    setImagenArchivo(imagen);
+    setImagenEnlace("");
+    setErrorVistaPrevia(false);
+  };
+
+  const tomarFoto = async () => {
+    try {
+      const permiso = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permiso.granted) {
+        Alert.alert(
+          "Permiso requerido",
+          "Activa el permiso de cámara para tomar una foto."
+        );
+        return;
+      }
+      const resultado = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        quality: 0.3,
+        base64: true,
+      });
+      aceptarImagen(imagenDesdeResultado(resultado));
+    } catch (e) {
+      Alert.alert("Cámara", "No se pudo abrir la cámara en este dispositivo.");
+    }
+  };
+
+  const elegirDeGaleria = async () => {
+    try {
+      const resultado = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        quality: 0.3,
+        base64: true,
+      });
+      aceptarImagen(imagenDesdeResultado(resultado));
+    } catch (e) {
+      Alert.alert("Galería", "No se pudo abrir la galería de imágenes.");
+    }
+  };
+
+  const seleccionarImagen = () => {
+    Alert.alert("Cambiar imagen", "Elige cómo quieres actualizar el flyer", [
+      { text: "Tomar foto (Cámara)", onPress: tomarFoto },
+      { text: "Elegir de galería", onPress: elegirDeGaleria },
+      { text: "Cancelar", style: "cancel" },
+    ]);
+  };
+
+  const quitarImagen = () => {
+    setImagenArchivo("");
+    setImagenEnlace("");
+    setErrorVistaPrevia(false);
+  };
 
   const guardar = async () => {
     if (guardando) return;
@@ -61,18 +154,36 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
     ) {
       return Alert.alert(
         "Campos obligatorios",
-        "Completa nombre, categoría, fecha, hora y lugar.",
+        "Completa nombre, categoría, fecha, hora y lugar."
       );
+    }
+
+    if (form.enlace.trim() && !/^https?:\/\//i.test(form.enlace.trim())) {
+      return Alert.alert(
+        "Enlace inválido",
+        "El enlace oficial debe empezar con http:// o https://"
+      );
+    }
+
+    const imagenFinal = imagenArchivo || enlaceLimpio;
+    const problemaImagen = validarImagenEvento(imagenFinal);
+    if (problemaImagen) {
+      return Alert.alert("Imagen inválida", problemaImagen);
     }
 
     setGuardando(true);
     const cambios = {
       ...form,
-      fecha: form.fecha,
-      hora: form.hora,
-      fechaInicio: form.fechaInicio,
+      titulo: form.titulo.trim(),
+      lugar: form.lugar.trim(),
+      precio: form.precio.trim(),
+      organizador: form.organizador.trim(),
+      enlace: form.enlace.trim(),
+      descripcion: form.descripcion.trim(),
+      imagen: imagenFinal,
       posicion: form.posicion || "center",
     };
+
     const resultado = await editarEvento(evento.id, cambios, sesion);
     setGuardando(false);
 
@@ -87,14 +198,17 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
         {
           text: "Aceptar",
           onPress: () =>
-            navigation.navigate("DetalleEvento", { evento: eventoActualizado }),
+            navigation.popTo("DetalleEvento", { evento: eventoActualizado }),
         },
-      ],
+      ]
     );
   };
 
   return (
-    <View style={estilos.contenedor}>
+    <KeyboardAvoidingView
+      style={estilos.contenedor}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
       {/* Cabecera morada fijada arriba */}
       <View style={estilos.cabeceraFija}>
         <TouchableOpacity
@@ -107,79 +221,41 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
         <Text style={estilos.titulo}>Editar evento</Text>
       </View>
 
-      {/* Formulario desplazable debajo */}
+      {/* Formulario ordenado */}
       <ScrollView
         contentContainerStyle={estilos.formulario}
         keyboardShouldPersistTaps="handled"
       >
-        {CAMPOS.map((campo) => {
-          const esUrl = campo === "enlace" || campo === "imagen";
-          return (
-            <View key={campo}>
-              <Text style={estilos.etiqueta}>{campo}</Text>
-              <TextInput
-                style={estilos.input}
-                value={String(form[campo])}
-                onChangeText={(valor) => cambiar(campo, valor)}
-                multiline={campo === "descripcion"}
-                editable={!guardando}
-                autoCapitalize={esUrl ? "none" : "sentences"}
-                keyboardType={esUrl ? "url" : "default"}
-                onFocus={() => setCampoActivo(campo)}
-                onBlur={() => setCampoActivo(null)}
-                selection={
-                  esUrl && campoActivo !== campo
-                    ? { start: 0, end: 0 }
-                    : undefined
-                }
-              />
+        <Text style={estilos.etiqueta}>Nombre del evento *</Text>
+        <TextInput
+          style={estilos.input}
+          value={form.titulo}
+          onChangeText={(valor) => cambiar("titulo", valor)}
+          placeholder="Ej. Feria de Anime"
+          placeholderTextColor="#999"
+          editable={!guardando}
+        />
 
-              {/* Vista previa y ajuste de encuadre debajo del campo imagen */}
-              {campo === "imagen" && form.imagen?.trim() ? (
-                <View style={estilos.encuadreBox}>
-                  <Image
-                    source={{ uri: form.imagen.trim() }}
-                    style={estilos.vistaPreviaImagen}
-                    contentFit="cover"
-                    contentPosition={form.posicion || "center"}
-                  />
-                  <Text style={estilos.encuadreTitulo}>
-                    Encuadre en tarjeta del catálogo:
-                  </Text>
-                  <View style={estilos.encuadreFila}>
-                    {[
-                      { id: "top", label: "Arriba" },
-                      { id: "center", label: "Centro" },
-                      { id: "bottom", label: "Abajo" },
-                    ].map((op) => {
-                      const activo = (form.posicion || "center") === op.id;
-                      return (
-                        <TouchableOpacity
-                          key={op.id}
-                          style={[
-                            estilos.encuadreBtn,
-                            activo && estilos.encuadreBtnActivo,
-                          ]}
-                          onPress={() => cambiar("posicion", op.id)}
-                          disabled={guardando}
-                        >
-                          <Text
-                            style={[
-                              estilos.encuadreBtnTexto,
-                              activo && estilos.encuadreBtnTextoActivo,
-                            ]}
-                          >
-                            {op.label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-              ) : null}
-            </View>
-          );
-        })}
+        <Text style={estilos.etiqueta}>Categoría *</Text>
+        <View style={estilos.categorias}>
+          {INTERESES.map((item) => {
+            const activa = form.categoria === item.label;
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={[estilos.chip, activa && estilos.chipActivo]}
+                onPress={() => cambiar("categoria", item.label)}
+                disabled={guardando}
+              >
+                <Text
+                  style={[estilos.chipTexto, activa && estilos.chipTextoActivo]}
+                >
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
         <Text style={estilos.etiqueta}>Fecha *</Text>
         <TouchableOpacity
@@ -187,7 +263,9 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
           onPress={() => setMostrarFecha(true)}
           disabled={guardando}
         >
-          <Text>{form.fecha || "Seleccionar fecha"}</Text>
+          <Text style={estilos.textoSelector}>
+            {form.fecha || "Seleccionar fecha"}
+          </Text>
         </TouchableOpacity>
         {mostrarFecha ? (
           <DateTimePicker
@@ -213,7 +291,9 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
           onPress={() => setMostrarHora(true)}
           disabled={guardando}
         >
-          <Text>{form.hora || "Seleccionar hora"}</Text>
+          <Text style={estilos.textoSelector}>
+            {form.hora || "Seleccionar hora"}
+          </Text>
         </TouchableOpacity>
         {mostrarHora ? (
           <DateTimePicker
@@ -234,8 +314,168 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
           />
         ) : null}
 
+                <Text style={estilos.etiqueta}>Lugar *</Text>
+        <TextInput
+          style={estilos.input}
+          value={form.lugar}
+          onChangeText={(valor) => cambiar("lugar", valor)}
+          placeholder="Dirección o recinto"
+          placeholderTextColor="#999"
+          editable={!guardando}
+        />
+
+        <Text style={estilos.etiqueta}>Precio</Text>
+        <TextInput
+          style={estilos.input}
+          value={form.precio}
+          onChangeText={(valor) => cambiar("precio", valor)}
+          placeholder="Ej. Gratis o Desde S/ 50"
+          placeholderTextColor="#999"
+          editable={!guardando}
+        />
+
+        <Text style={estilos.etiqueta}>Organizador</Text>
+        <TextInput
+          style={estilos.input}
+          value={form.organizador}
+          onChangeText={(valor) => cambiar("organizador", valor)}
+          placeholder="Nombre del organizador"
+          placeholderTextColor="#999"
+          editable={!guardando}
+        />
+
+        <Text style={estilos.etiqueta}>Enlace oficial</Text>
+        <TextInput
+          style={estilos.input}
+          value={form.enlace}
+          onChangeText={(valor) => cambiar("enlace", valor)}
+          placeholder="https://..."
+          placeholderTextColor="#999"
+          autoCapitalize="none"
+          keyboardType="url"
+          editable={!guardando}
+          onFocus={() => setCampoActivo("enlace")}
+          onBlur={() => setCampoActivo(null)}
+          selection={campoActivo !== "enlace" ? { start: 0, end: 0 } : undefined}
+        />
+
+        {/* Sección de imagen con cámara/galería, botón quitar y encuadre */}
+        <Text style={estilos.etiqueta}>Imagen del evento</Text>
         <TouchableOpacity
-          style={estilos.boton}
+          style={estilos.botonImagen}
+          onPress={seleccionarImagen}
+          disabled={guardando}
+          activeOpacity={0.8}
+        >
+          <MaterialIcons name="add-photo-alternate" size={20} color="#5B4BDB" />
+          <Text style={estilos.botonImagenTexto}>
+            {imagenVista
+              ? "Cambiar imagen (Cámara / Galería)"
+              : "Subir imagen (Cámara / Galería)"}
+          </Text>
+        </TouchableOpacity>
+
+        {imagenVista ? (
+          <View style={estilos.previewContenedor}>
+            {errorVistaPrevia ? (
+              <View style={[estilos.vistaPreviaImagen, estilos.previewError]}>
+                <MaterialIcons name="broken-image" size={32} color="#999" />
+                <Text style={estilos.previewErrorTexto}>
+                  No se pudo cargar la imagen
+                </Text>
+              </View>
+            ) : (
+              <Image
+                source={{ uri: imagenVista }}
+                style={estilos.vistaPreviaImagen}
+                contentFit="cover"
+                contentPosition={form.posicion || "center"}
+                onError={() => setErrorVistaPrevia(true)}
+              />
+            )}
+
+            <TouchableOpacity
+              style={estilos.botonQuitar}
+              onPress={quitarImagen}
+              activeOpacity={0.8}
+              disabled={guardando}
+            >
+              <MaterialIcons name="close" size={18} color="#FFF" />
+            </TouchableOpacity>
+
+            {!errorVistaPrevia && (
+              <View style={estilos.encuadreBox}>
+                <Text style={estilos.encuadreTitulo}>
+                  Encuadre en tarjeta del catálogo:
+                </Text>
+                <View style={estilos.encuadreFila}>
+                  {[
+                    { id: "top", label: "Arriba" },
+                    { id: "center", label: "Centro" },
+                    { id: "bottom", label: "Abajo" },
+                  ].map((op) => {
+                    const activo = (form.posicion || "center") === op.id;
+                    return (
+                      <TouchableOpacity
+                        key={op.id}
+                        style={[
+                          estilos.encuadreBtn,
+                          activo && estilos.encuadreBtnActivo,
+                        ]}
+                        onPress={() => cambiar("posicion", op.id)}
+                        disabled={guardando}
+                      >
+                        <Text
+                          style={[
+                            estilos.encuadreBtnTexto,
+                            activo && estilos.encuadreBtnTextoActivo,
+                          ]}
+                        >
+                          {op.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+          </View>
+        ) : null}
+
+        <Text style={estilos.separador}>
+          {imagenArchivo
+            ? "Quita la imagen para usar un enlace"
+            : "o usa un enlace (opcional)"}
+        </Text>
+        <TextInput
+          style={[estilos.input, Boolean(imagenArchivo) && estilos.inputBloqueado]}
+          value={imagenEnlace}
+          onChangeText={cambiarEnlaceImagen}
+          placeholder="https://ejemplo.com"
+          placeholderTextColor="#999"
+          autoCapitalize="none"
+          keyboardType="url"
+          editable={!guardando && !imagenArchivo}
+          onFocus={() => setCampoActivo("imagenEnlace")}
+          onBlur={() => setCampoActivo(null)}
+          selection={
+            campoActivo !== "imagenEnlace" ? { start: 0, end: 0 } : undefined
+          }
+        />
+
+        <Text style={estilos.etiqueta}>Descripción</Text>
+        <TextInput
+          style={[estilos.input, estilos.inputMultilinea]}
+          value={form.descripcion}
+          onChangeText={(valor) => cambiar("descripcion", valor)}
+          placeholder="Detalles del evento"
+          placeholderTextColor="#999"
+          multiline={true}
+          editable={!guardando}
+        />
+
+        <TouchableOpacity
+          style={[estilos.boton, guardando && estilos.botonDeshabilitado]}
           onPress={guardar}
           disabled={guardando}
         >
@@ -244,7 +484,7 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
           </Text>
         </TouchableOpacity>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -253,51 +493,132 @@ const estilos = StyleSheet.create({
   cabeceraFija: {
     flexDirection: "row",
     alignItems: "center",
-    paddingTop: 50,
-    paddingBottom: 18,
-    paddingHorizontal: 20,
     backgroundColor: "#5B4BDB",
-    gap: 12,
+    paddingTop: 50,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
   },
   botonAtras: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    justifyContent: "center",
-    alignItems: "center",
+    marginRight: 12,
+    padding: 4,
   },
-  titulo: { fontSize: 22, fontWeight: "bold", color: "#FFF" },
-  formulario: { padding: 20, paddingBottom: 40 },
+  titulo: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#FFF",
+  },
+  formulario: {
+    padding: 20,
+    paddingBottom: 40,
+  },
   etiqueta: {
-    textTransform: "capitalize",
+    fontSize: 14,
     fontWeight: "600",
-    marginBottom: 6,
     color: "#333",
+    marginBottom: 6,
   },
   input: {
-    backgroundColor: "#FFF",
+    minHeight: 48,
     borderWidth: 1,
     borderColor: "#DDD",
+    backgroundColor: "#FFF",
     borderRadius: 10,
-    padding: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: "#222",
+    marginBottom: 14,
+    justifyContent: "center",
+  },
+  inputMultilinea: {
+    minHeight: 96,
+    textAlignVertical: "top",
+  },
+  inputBloqueado: {
+    backgroundColor: "#EEE",
+    color: "#888",
+  },
+  textoSelector: {
+    fontSize: 15,
+    color: "#222",
+  },
+  categorias: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
     marginBottom: 14,
   },
-  boton: {
-    backgroundColor: "#5B4BDB",
-    padding: 15,
-    borderRadius: 10,
-    marginTop: 8,
+  chip: {
+    borderWidth: 1,
+    borderColor: "#DDD",
+    backgroundColor: "#FFF",
+    paddingVertical: 8,
+    paddingHorizontal: 13,
+    borderRadius: 20,
   },
-  botonTexto: { color: "#FFF", textAlign: "center", fontWeight: "bold" },
-    vistaPreviaImagen: {
+  chipActivo: {
+    backgroundColor: "#5B4BDB",
+    borderColor: "#5B4BDB",
+  },
+  chipTexto: {
+    fontSize: 13,
+    color: "#444",
+    fontWeight: "600",
+  },
+  chipTextoActivo: {
+    color: "#FFF",
+  },
+  botonImagen: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#EBE8FF",
+    borderWidth: 1,
+    borderColor: "#5B4BDB",
+    borderStyle: "dashed",
+    paddingVertical: 13,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  botonImagenTexto: {
+    color: "#5B4BDB",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  previewContenedor: {
+    position: "relative",
+    marginBottom: 8,
+  },
+  vistaPreviaImagen: {
     width: "100%",
     height: 160,
     borderRadius: 10,
-    marginBottom: 8,
+    backgroundColor: "#EAEAEA",
+  },
+  previewError: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  previewErrorTexto: {
+    fontSize: 13,
+    color: "#888",
+    marginTop: 6,
+  },
+  botonQuitar: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(0, 0, 0, 0.68)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   encuadreBox: {
-    marginBottom: 14,
+    marginTop: 10,
+    marginBottom: 6,
   },
   encuadreTitulo: {
     fontSize: 13,
@@ -329,5 +650,26 @@ const estilos = StyleSheet.create({
   },
   encuadreBtnTextoActivo: {
     color: "#FFF",
+  },
+  separador: {
+    fontSize: 12,
+    color: "#777",
+    textAlign: "center",
+    marginVertical: 6,
+  },
+  boton: {
+    backgroundColor: "#5B4BDB",
+    paddingVertical: 15,
+    borderRadius: 10,
+    marginTop: 8,
+    alignItems: "center",
+  },
+  botonDeshabilitado: {
+    backgroundColor: "#B8B0EB",
+  },
+  botonTexto: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });
