@@ -10,6 +10,7 @@ import PestanasPrincipales from './navigation/PestanasPrincipales';
 import EditarEventoScreen from './screens/EditarEventoScreen';
 import EditarSolicitudScreen from './screens/EditarSolicitudScreen';
 import { inicializarAuth, suscribirSesion, obtenerSesion } from './services/authService';
+import { configurarNotificaciones } from './services/notificacionesService';
 
 const Stack = createNativeStackNavigator();
 
@@ -18,6 +19,8 @@ export default function App() {
   const [cargado, setCargado] = useState(false);
 
   useEffect(() => {
+    configurarNotificaciones().catch(() => {});
+
     let activo = true;
     inicializarAuth()
       .then((sesionInicial) => {
