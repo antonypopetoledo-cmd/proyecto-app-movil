@@ -101,7 +101,8 @@ export default function CatalogScreen({ navigation, sesion }) {
 
   const toggleFavorito = async (id) => {
     try {
-      await alternarFavorito(id);
+      const evento = eventos.find((item) => item.id === id);
+      await alternarFavorito(id, evento?.titulo);
     } catch (e) {
       Alert.alert(
         "Favoritos",

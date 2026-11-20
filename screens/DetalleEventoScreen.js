@@ -34,6 +34,8 @@ const Dato = ({ icono, etiqueta, children }) => (
   </>
 );
 
+const coordenadasPorLugar = new Map();
+
 export default function DetalleEventoScreen({ route, navigation, sesion }) {
   const { evento } = route.params;
   const esSolicitud = route.params.esSolicitud === true;
@@ -48,7 +50,7 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
 
   const toggleFavorito = async () => {
     try {
-      await alternarFavorito(evento.id);
+      await alternarFavorito(evento.id, evento.titulo);
     } catch (e) {
       Alert.alert("Favoritos", "No se pudo actualizar favoritos.");
     }
@@ -62,9 +64,12 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
   const puedeGuardarRecordatorio = !esAdmin && !esSolicitud;
 
   const obtenerCoordenadasEvento = async () => {
-    if (!evento.lugar?.trim()) return null;
+    const lugar = evento.lugar?.trim();
+    if (!lugar) return null;
+    if (coordenadasPorLugar.has(lugar)) return coordenadasPorLugar.get(lugar);
+
     try {
-      const resultados = await Location.geocodeAsync(evento.lugar.trim());
+      const resultados = await Location.geocodeAsync(lugar);
       const coordenadas = resultados[0]
         ? {
             latitude: resultados[0].latitude,
@@ -72,6 +77,7 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
           }
         : null;
       if (coordenadasValidas(coordenadas)) {
+        coordenadasPorLugar.set(lugar, coordenadas);
         setCoordenadasEvento(coordenadas);
         return coordenadas;
       }
@@ -81,20 +87,27 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
     return null;
   };
 
-  const actualizarDistancia = async (posicion = null) => {
-    const ubicacion = posicion || ubicacionActual;
-    if (!ubicacion) return;
+  const convertirPosicion = (posicion) => {
+    if (!posicion?.coords) return null;
+    const coordenadas = {
+      latitude: posicion.coords.latitude,
+      longitude: posicion.coords.longitude,
+    };
+    return coordenadasValidas(coordenadas) ? coordenadas : null;
+  };
 
-    setCargandoDistancia(true);
-    try {
-      const destino = coordenadasEvento || (await obtenerCoordenadasEvento());
-      const metros = calcularDistanciaMetros(ubicacion, destino);
-      setDistancia(metros);
-    } catch (e) {
-      setDistancia(null);
-    } finally {
-      setCargandoDistancia(false);
-    }
+  const obtenerUbicacionRapida = async () => {
+    const ultimaPosicion = await Location.getLastKnownPositionAsync({
+      maxAge: 300000,
+      requiredAccuracy: 1000,
+    });
+    const ultimaUbicacion = convertirPosicion(ultimaPosicion);
+    if (ultimaUbicacion) return ultimaUbicacion;
+
+    const posicionActual = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+    return convertirPosicion(posicionActual);
   };
 
   useEffect(() => {
@@ -105,19 +118,19 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
         const permiso = await Location.getForegroundPermissionsAsync();
         if (!activo || !permiso.granted) return;
 
-        const posicion = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
+        setCargandoDistancia(true);
+        const [ubicacion, destino] = await Promise.all([
+          obtenerUbicacionRapida(),
+          obtenerCoordenadasEvento(),
+        ]);
         if (!activo) return;
 
-        const coordenadas = {
-          latitude: posicion.coords.latitude,
-          longitude: posicion.coords.longitude,
-        };
-        setUbicacionActual(coordenadas);
-        await actualizarDistancia(coordenadas);
+        setUbicacionActual(ubicacion);
+        setDistancia(calcularDistanciaMetros(ubicacion, destino));
       } catch (e) {
         if (activo) setDistancia(null);
+      } finally {
+        if (activo) setCargandoDistancia(false);
       }
     };
 
@@ -194,15 +207,22 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
     }
 
     let origen;
+    let destino;
     try {
-      const posicion = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      const [posicion, coordenadasDestino] = await Promise.all([
+        Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        }),
+        coordenadasEvento || obtenerCoordenadasEvento(),
+      ]);
+      destino = coordenadasDestino;
       origen = {
         latitude: posicion.coords.latitude,
         longitude: posicion.coords.longitude,
       };
       setUbicacionActual(origen);
+
+      setDistancia(calcularDistanciaMetros(origen, destino));
     } catch (e) {
       Alert.alert(
         "No se pudo obtener tu ubicación",
@@ -210,9 +230,6 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
       );
       return;
     }
-
-    const destino = coordenadasEvento || (await obtenerCoordenadasEvento());
-    setDistancia(destino ? calcularDistanciaMetros(origen, destino) : null);
 
     const origenTexto = encodeURIComponent(`${origen.latitude},${origen.longitude}`);
     const destinoTexto = encodeURIComponent(
