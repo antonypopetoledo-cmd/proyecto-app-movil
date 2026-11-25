@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -16,7 +17,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { editarEvento } from "../services/eventosService";
 import { validarImagenEvento } from "../services/solicitudesService";
-import { INTERESES } from "../data/categorias";
+import { INTERESES, obtenerNombreCategoria } from "../data/categorias";
 import {
   crearFechaInicio,
   fechaDesdeInicio,
@@ -65,6 +66,22 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
   const [mostrarHora, setMostrarHora] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [campoActivo, setCampoActivo] = useState(null);
+
+  const scrollRef = useRef(null);
+  const [tecladoAbierto, setTecladoAbierto] = useState(false);
+
+  useEffect(() => {
+    const mostrar = Keyboard.addListener("keyboardDidShow", () => {
+      setTecladoAbierto(true);
+    });
+    const ocultar = Keyboard.addListener("keyboardDidHide", () => {
+      setTecladoAbierto(false);
+    });
+    return () => {
+      mostrar.remove();
+      ocultar.remove();
+    };
+  }, []);
 
   const enlaceLimpio = imagenEnlace.trim();
   const imagenVista =
@@ -176,7 +193,7 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
       ...form,
       titulo: form.titulo.trim(),
       lugar: form.lugar.trim(),
-      precio: form.precio.trim(),
+      precio: form.precio.trim() || "Gratis",
       organizador: form.organizador.trim(),
       enlace: form.enlace.trim(),
       descripcion: form.descripcion.trim(),
@@ -223,7 +240,12 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
 
       {/* Formulario ordenado */}
       <ScrollView
-        contentContainerStyle={estilos.formulario}
+        ref={scrollRef}
+        style={{ flex: 1 }}
+        contentContainerStyle={[
+          estilos.formulario,
+          tecladoAbierto && { paddingBottom: 220 },
+        ]}
         keyboardShouldPersistTaps="handled"
       >
         <Text style={estilos.etiqueta}>Nombre del evento *</Text>
@@ -239,17 +261,22 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
         <Text style={estilos.etiqueta}>Categoría *</Text>
         <View style={estilos.categorias}>
           {INTERESES.map((item) => {
-            const activa = form.categoria === item.label;
+            const nombreActual = obtenerNombreCategoria(form.categoria);
+            const activa =
+              form.categoria === item.id ||
+              form.categoria === item.label ||
+              nombreActual === `${item.emoji} ${item.label}`;
             return (
               <TouchableOpacity
                 key={item.id}
                 style={[estilos.chip, activa && estilos.chipActivo]}
-                onPress={() => cambiar("categoria", item.label)}
+                onPress={() => cambiar("categoria", item.id)}
                 disabled={guardando}
               >
                 <Text
                   style={[estilos.chipTexto, activa && estilos.chipTextoActivo]}
                 >
+                  {item.emoji ? `${item.emoji} ` : ""}
                   {item.label}
                 </Text>
               </TouchableOpacity>
@@ -463,6 +490,105 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
           }
         />
 
+        <Text style={estilos.etiqueta}>Imagen del evento</Text>
+
+        {imagenVista ? (
+          <View style={estilos.previewContenedor}>
+            {errorVistaPrevia ? (
+              <View style={[estilos.vistaPreviaImagen, estilos.previewError]}>
+                <MaterialIcons name="broken-image" size={32} color="#999" />
+                <Text style={estilos.previewErrorTexto}>
+                  No se pudo cargar la imagen
+                </Text>
+              </View>
+            ) : (
+              <Image
+                source={{ uri: imagenVista }}
+                style={estilos.vistaPreviaImagen}
+                contentFit="cover"
+                contentPosition={form.posicion || "center"}
+                onError={() => setErrorVistaPrevia(true)}
+              />
+            )}
+
+            <TouchableOpacity
+              style={estilos.botonQuitar}
+              onPress={quitarImagen}
+              activeOpacity={0.8}
+              disabled={guardando}
+            >
+              <MaterialIcons name="close" size={18} color="#FFF" />
+            </TouchableOpacity>
+
+            {!errorVistaPrevia && (
+              <View style={estilos.encuadreBox}>
+                <Text style={estilos.encuadreTitulo}>
+                  Encuadre en tarjeta del catálogo:
+                </Text>
+                <View style={estilos.encuadreFila}>
+                  {[
+                    { id: "top", label: "Arriba" },
+                    { id: "center", label: "Centro" },
+                    { id: "bottom", label: "Abajo" },
+                  ].map((op) => {
+                    const activo = (form.posicion || "center") === op.id;
+                    return (
+                      <TouchableOpacity
+                        key={op.id}
+                        style={[
+                          estilos.encuadreBtn,
+                          activo && estilos.encuadreBtnActivo,
+                        ]}
+                        onPress={() => cambiar("posicion", op.id)}
+                        disabled={guardando}
+                      >
+                        <Text
+                          style={[
+                            estilos.encuadreBtnTexto,
+                            activo && estilos.encuadreBtnTextoActivo,
+                          ]}
+                        >
+                          {op.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+          </View>
+        ) : (
+          <>
+            <TouchableOpacity
+              style={estilos.botonImagen}
+              onPress={seleccionarImagen}
+              disabled={guardando}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="add-photo-alternate" size={20} color="#5B4BDB" />
+              <Text style={estilos.botonImagenTexto}>
+                Subir imagen (Cámara / Galería)
+              </Text>
+            </TouchableOpacity>
+
+            <Text style={estilos.separador}>o usa un enlace (opcional)</Text>
+            <TextInput
+              style={estilos.input}
+              value={imagenEnlace}
+              onChangeText={cambiarEnlaceImagen}
+              placeholder="https://ejemplo.com"
+              placeholderTextColor="#999"
+              autoCapitalize="none"
+              keyboardType="url"
+              editable={!guardando}
+              onFocus={() => setCampoActivo("imagenEnlace")}
+              onBlur={() => setCampoActivo(null)}
+              selection={
+                campoActivo !== "imagenEnlace" ? { start: 0, end: 0 } : undefined
+              }
+            />
+          </>
+        )}
         <Text style={estilos.etiqueta}>Descripción</Text>
         <TextInput
           style={[estilos.input, estilos.inputMultilinea]}
@@ -472,6 +598,13 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
           placeholderTextColor="#999"
           multiline={true}
           editable={!guardando}
+          onFocus={() => {
+            setCampoActivo("descripcion");
+            setTimeout(() => {
+              scrollRef.current?.scrollToEnd({ animated: true });
+            }, 250);
+          }}
+          onBlur={() => setCampoActivo(null)}
         />
 
         <TouchableOpacity

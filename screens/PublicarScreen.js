@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from "react-native";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
@@ -96,6 +97,7 @@ export default function PublicarScreen({ sesion, navigation }) {
   const [fechaCalendario, setFechaCalendario] = useState(new Date());
   const [horaCalendario, setHoraCalendario] = useState(new Date());
   const [enviando, setEnviando] = useState(false);
+  const scrollRef = useRef(null);
 
   const esAdmin = sesion?.rol === "administrador";
 
@@ -213,8 +215,21 @@ export default function PublicarScreen({ sesion, navigation }) {
     setError("");
     if (enviando) return;
     setEnviando(true);
+
+    const datosLimpios = {
+      ...form,
+      titulo: form.titulo.trim(),
+      lugar: form.lugar.trim(),
+      precio: form.precio.trim() || "Gratis",
+      organizador:
+        form.organizador.trim() || sesion?.nombre || "Comunidad LimaGo",
+      descripcion: form.descripcion.trim(),
+      enlace: form.enlace.trim(),
+      imagen: imagenFinal,
+    };
+
     try {
-      await enviarSolicitud({ ...form, imagen: imagenFinal });
+      await enviarSolicitud(datosLimpios);
       setForm(CAMPOS_VACIOS);
       quitarImagen();
       Alert.alert(
@@ -232,6 +247,21 @@ export default function PublicarScreen({ sesion, navigation }) {
     }
   };
 
+  const [tecladoAbierto, setTecladoAbierto] = useState(false);
+
+  useEffect(() => {
+    const mostrar = Keyboard.addListener("keyboardDidShow", () => {
+      setTecladoAbierto(true);
+    });
+    const ocultar = Keyboard.addListener("keyboardDidHide", () => {
+      setTecladoAbierto(false);
+    });
+    return () => {
+      mostrar.remove();
+      ocultar.remove();
+    };
+  }, []);
+
   return (
     <KeyboardAvoidingView
       style={estilos.contenedor}
@@ -247,7 +277,11 @@ export default function PublicarScreen({ sesion, navigation }) {
       </View>
 
       <ScrollView
-        contentContainerStyle={estilos.formulario}
+        ref={scrollRef}
+        contentContainerStyle={[
+          estilos.formulario,
+          tecladoAbierto && { paddingBottom: 220 },
+        ]}
         keyboardShouldPersistTaps="handled"
       >
         <CampoTexto
@@ -261,18 +295,18 @@ export default function PublicarScreen({ sesion, navigation }) {
         <Text style={estilos.label}>Categoría *</Text>
         <View style={estilos.categorias}>
           {INTERESES.map((item) => {
-            const activa = form.categoria === item.label;
+            const activa = form.categoria === item.id;
             return (
               <TouchableOpacity
                 key={item.id}
                 style={[estilos.chip, activa && estilos.chipActivo]}
-                onPress={() => cambiar("categoria")(item.label)}
-                activeOpacity={0.8}
+                onPress={() => cambiar("categoria")(item.id)}
                 disabled={enviando}
               >
                 <Text
                   style={[estilos.chipTexto, activa && estilos.chipTextoActivo]}
                 >
+                  {item.emoji ? `${item.emoji} ` : ""}
                   {item.label}
                 </Text>
               </TouchableOpacity>
@@ -295,6 +329,7 @@ export default function PublicarScreen({ sesion, navigation }) {
             <DateTimePicker
               value={fechaCalendario}
               mode="date"
+              minimumDate={new Date()}
               onValueChange={(evento, fecha) => {
                 if (!fecha) return;
                 setFechaCalendario(fecha);
@@ -376,19 +411,8 @@ export default function PublicarScreen({ sesion, navigation }) {
           esUrl={true}
         />
 
-        {/* Imagen del evento: botón principal (cámara/galería) + enlace secundario */}
+        {/* Imagen del evento: si hay vista previa oculta los botones de carga */}
         <Text style={estilos.label}>Imagen del evento</Text>
-        <TouchableOpacity
-          style={estilos.botonImagen}
-          onPress={seleccionarImagen}
-          activeOpacity={0.8}
-          disabled={enviando}
-        >
-          <MaterialIcons name="add-photo-alternate" size={22} color="#5B4BDB" />
-          <Text style={estilos.botonImagenTexto}>
-            Seleccionar imagen del evento
-          </Text>
-        </TouchableOpacity>
 
         {imagenVista ? (
           <View style={estilos.previewContenedor}>
@@ -456,32 +480,50 @@ export default function PublicarScreen({ sesion, navigation }) {
               </View>
             )}
           </View>
-        ) : null}
+        ) : (
+          <>
+            <TouchableOpacity
+              style={estilos.botonImagen}
+              onPress={seleccionarImagen}
+              activeOpacity={0.8}
+              disabled={enviando}
+            >
+              <MaterialIcons name="add-photo-alternate" size={22} color="#5B4BDB" />
+              <Text style={estilos.botonImagenTexto}>
+                Seleccionar imagen del evento
+              </Text>
+            </TouchableOpacity>
 
-        <Text style={estilos.separador}>
-          {imagenArchivo
-            ? "Quita la imagen para usar un enlace"
-            : "o usa un enlace (opcional)"}
-        </Text>
-        <CampoTexto
-          etiqueta="Imagen (enlace)"
-          valor={imagenEnlace}
-          onChangeText={cambiarEnlaceImagen}
-          placeholder="Escribir dirección de la imagen"
-          autoCapitalize="none"
-          keyboardType="url"
-          editable={!enviando && !imagenArchivo}
-          esUrl={true}
-        />
+            <Text style={estilos.separador}>o usa un enlace (opcional)</Text>
+            <CampoTexto
+              etiqueta="Imagen (enlace)"
+              valor={imagenEnlace}
+              onChangeText={cambiarEnlaceImagen}
+              placeholder="Escribir dirección de la imagen"
+              autoCapitalize="none"
+              keyboardType="url"
+              editable={!enviando}
+              esUrl={true}
+            />
+          </>
+        )}
 
-        <CampoTexto
-          etiqueta="Descripción"
-          valor={form.descripcion}
-          onChangeText={cambiar("descripcion")}
-          placeholder="Cuéntanos de qué trata el evento"
-          multilinea={true}
-          editable={!enviando}
-        />
+        <View
+          onTouchStart={() => {
+            setTimeout(() => {
+              scrollRef.current?.scrollToEnd({ animated: true });
+            }, 250);
+          }}
+        >
+          <CampoTexto
+            etiqueta="Descripción"
+            valor={form.descripcion}
+            onChangeText={cambiar("descripcion")}
+            placeholder="Cuéntanos de qué trata el evento"
+            multilinea={true}
+            editable={!enviando}
+          />
+        </View>
 
         {error ? <Text style={estilos.error}>{error}</Text> : null}
 

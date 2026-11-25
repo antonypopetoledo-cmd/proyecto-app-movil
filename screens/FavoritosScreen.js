@@ -13,6 +13,7 @@ import { Image } from "expo-image";
 import { MaterialIcons } from "@expo/vector-icons";
 import useEventos from "../hooks/useEventos";
 import useFavoritos from "../hooks/useFavoritos";
+import { obtenerNombreCategoria } from "../data/categorias";
 
 export default function FavoritosScreen({ navigation, sesion }) {
   const { eventos, loading, refreshing, error, recargar, reintentar } =
@@ -110,10 +111,13 @@ export default function FavoritosScreen({ navigation, sesion }) {
               </View>
 
               <View style={styles.info}>
-                <View style={styles.rowTop}>
-                  <Text style={styles.categoria}>{item.categoria}</Text>
-                  <Text style={styles.precio}>{item.precio}</Text>
-                </View>
+             <View style={styles.rowTop}>
+               <Text style={styles.categoria}>
+                 {obtenerNombreCategoria(item.categoria)}
+               </Text>
+               <Text style={styles.precio}>{item.precio || "Gratis"}</Text>
+             </View>
+
                 <Text style={styles.titulo}>{item.titulo}</Text>
                 <Text style={styles.detalle}>
                   {item.fecha}

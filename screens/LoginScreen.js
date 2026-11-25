@@ -1,13 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
   Alert,
-  ScrollView,
   ActivityIndicator,
+  Keyboard,
 } from "react-native";
 import {
   registrarUsuario,
@@ -30,6 +33,28 @@ export default function LoginScreen() {
   const [verConfirmar, setVerConfirmar] = useState(false);
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
+
+  const scrollRef = useRef(null);
+  const [tecladoAbierto, setTecladoAbierto] = useState(false);
+
+  useEffect(() => {
+    const mostrar = Keyboard.addListener("keyboardDidShow", () => {
+      setTecladoAbierto(true);
+    });
+    const ocultar = Keyboard.addListener("keyboardDidHide", () => {
+      setTecladoAbierto(false);
+    });
+    return () => {
+      mostrar.remove();
+      ocultar.remove();
+    };
+  }, []);
+
+  const enfocarCampo = (posicionY) => {
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: posicionY, animated: true });
+    }, 220);
+  };
 
   const esRegistro = modo === "registro";
 
@@ -69,7 +94,7 @@ export default function LoginScreen() {
     setError("");
     setCargando(true);
     const resultado = await registrarUsuario({ nombre, apellido, email, password });
-        setCargando(false);
+    setCargando(false);
     if (!resultado.ok) {
       setError(resultado.mensaje);
       return;
@@ -124,8 +149,12 @@ export default function LoginScreen() {
 
   return (
     <ScrollView
+      ref={scrollRef}
       style={styles.scroll}
-      contentContainerStyle={styles.container}
+      contentContainerStyle={[
+        styles.container,
+        tecladoAbierto && { paddingBottom: 280 },
+      ]}
       keyboardShouldPersistTaps="handled"
     >
       {esRegistro ? (
@@ -173,6 +202,7 @@ export default function LoginScreen() {
               autoCapitalize="words"
               value={nombre}
               onChangeText={setNombre}
+              onFocus={() => enfocarCampo(80)}
             />
 
             <Text style={styles.label}>Apellido</Text>
@@ -183,6 +213,7 @@ export default function LoginScreen() {
               autoCapitalize="words"
               value={apellido}
               onChangeText={setApellido}
+              onFocus={() => enfocarCampo(140)}
             />
           </>
         )}
@@ -204,6 +235,7 @@ export default function LoginScreen() {
             autoCorrect={false}
             value={email}
             onChangeText={setEmail}
+            onFocus={() => enfocarCampo(esRegistro ? 210 : 140)}
           />
         </View>
 
@@ -225,6 +257,7 @@ export default function LoginScreen() {
             autoCapitalize="none"
             value={password}
             onChangeText={setPassword}
+            onFocus={() => enfocarCampo(esRegistro ? 280 : 220)}
           />
           <TouchableOpacity
             style={styles.eyeButton}
@@ -257,6 +290,7 @@ export default function LoginScreen() {
                 autoCapitalize="none"
                 value={confirmar}
                 onChangeText={setConfirmar}
+                onFocus={() => enfocarCampo(350)}
               />
               <TouchableOpacity
                 style={styles.eyeButton}

@@ -8,7 +8,11 @@ import {
   TouchableOpacity,
   Alert,
   Linking,
+  Share,
 } from "react-native";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../services/firebaseConfig";
+import { obtenerNombreCategoria } from "../data/categorias";
 import { Image } from "expo-image";
 import * as Location from "expo-location";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -39,6 +43,10 @@ const coordenadasPorLugar = new Map();
 export default function DetalleEventoScreen({ route, navigation, sesion }) {
   const { evento } = route.params;
   const esSolicitud = route.params.esSolicitud === true;
+  const esAdmin = sesion?.rol === "administrador";
+  const puedeGestionar = esAdmin && !esSolicitud;
+  // "Recordarme" solo para usuarios y solo en eventos ya publicados (no en solicitudes pendientes)
+  const puedeGuardarRecordatorio = !esAdmin && !esSolicitud;
   const [recordatorioEnviado, setRecordatorioEnviado] = useState(false);
   const [procesando, setProcesando] = useState(false);
   const [distancia, setDistancia] = useState(null);
@@ -56,12 +64,53 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
     }
   };
 
+  // Verifica al entrar si el usuario ya tenía activado el recordatorio de este evento
+  useEffect(() => {
+    let activo = true;
+    const verificarAsistencia = async () => {
+      if (!sesion?.uid || !evento?.id || esAdmin || esSolicitud) return;
+      try {
+        const snap = await getDoc(
+          doc(db, "eventos", String(evento.id), "asistencias", sesion.uid)
+        );
+        if (activo && snap.exists()) {
+          setRecordatorioEnviado(true);
+        }
+      } catch (e) {
+        // Si falla la consulta silenciosa, mantiene el estado por defecto
+      }
+    };
+    verificarAsistencia();
+    return () => {
+      activo = false;
+    };
+  }, [evento?.id, sesion?.uid, esAdmin, esSolicitud]);
+
+  const compartirEvento = async () => {
+    try {
+      const fechaTexto = evento.hora
+        ? `${evento.fecha} a las ${evento.hora}`
+        : evento.fecha;
+      const mensaje =
+        `🎉 *${evento.titulo}*\n` +
+        `📅 ${fechaTexto}\n` +
+        `📍 ${evento.lugar}\n` +
+        `🎟️ ${evento.precio || "Gratis"}\n\n` +
+        `¡Descúbrelo en LimaGo!`;
+
+      await Share.share({
+        message: mensaje,
+        title: evento.titulo,
+      });
+    } catch (e) {
+      // El usuario canceló el menú de compartir
+    }
+  };
+
   const insets = useSafeAreaInsets();
 
-  const esAdmin = sesion?.rol === "administrador";
-  const puedeGestionar = esAdmin && !esSolicitud;
-  // "Recordarme" solo para usuarios y solo en eventos ya publicados (no en solicitudes pendientes)
-  const puedeGuardarRecordatorio = !esAdmin && !esSolicitud;
+
+
 
   const obtenerCoordenadasEvento = async () => {
     const lugar = evento.lugar?.trim();
@@ -69,7 +118,7 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
     if (coordenadasPorLugar.has(lugar)) return coordenadasPorLugar.get(lugar);
 
     try {
-      const resultados = await Location.geocodeAsync(lugar);
+      const resultados = await Location.geocodeAsync(`${lugar}, Lima, Peru`);
       const coordenadas = resultados[0]
         ? {
             latitude: resultados[0].latitude,
@@ -160,7 +209,7 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
         "¡Recordatorio activado!",
         correo.ok
           ? `Guardamos el evento y te enviamos los detalles a ${sesion.email}.`
-          : "Guardamos el evento en tu lista, pero no pudimos enviar el correo de recordatorio.",
+          : `Guardamos el evento, pero no se envió el correo (${correo.mensaje}).`,
       );
     } catch (e) {
       Alert.alert("No se pudo activar", e?.message || "Inténtalo de nuevo.");
@@ -168,6 +217,7 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
       setProcesando(false);
     }
   };
+
 
   const abrirMapa = async () => {
     let permiso;
@@ -286,37 +336,50 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
           <MaterialIcons name="arrow-back" size={22} color="#222" />
         </TouchableOpacity>
 
-        {puedeGestionar ? (
-          <View style={styles.accionesGestion}>
+        <View style={styles.accionesGestion}>
+          {!esSolicitud && (
             <TouchableOpacity
               style={styles.botonCircular}
-              onPress={editar}
-              accessibilityLabel="Editar"
+              onPress={compartirEvento}
+              accessibilityLabel="Compartir"
             >
-              <MaterialIcons name="edit" size={20} color="#5B4BDB" />
+              <MaterialIcons name="share" size={20} color="#222" />
             </TouchableOpacity>
+          )}
+
+          {puedeGestionar ? (
+            <>
+              <TouchableOpacity
+                style={styles.botonCircular}
+                onPress={editar}
+                accessibilityLabel="Editar"
+              >
+                <MaterialIcons name="edit" size={20} color="#5B4BDB" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.botonCircular}
+                onPress={eliminar}
+                accessibilityLabel="Eliminar"
+              >
+                <MaterialIcons name="delete-outline" size={22} color="#E53935" />
+              </TouchableOpacity>
+            </>
+          ) : !esSolicitud ? (
             <TouchableOpacity
               style={styles.botonCircular}
-              onPress={eliminar}
-              accessibilityLabel="Eliminar"
+              onPress={toggleFavorito}
+              accessibilityLabel="Favorito"
             >
-              <MaterialIcons name="delete-outline" size={22} color="#E53935" />
+              <MaterialIcons
+                name={esFavorito ? "favorite" : "favorite-border"}
+                size={22}
+                color={esFavorito ? "#E53935" : "#222"}
+              />
             </TouchableOpacity>
-          </View>
-        ) : !esSolicitud ? (
-          <TouchableOpacity
-            style={styles.botonCircular}
-            onPress={toggleFavorito}
-            accessibilityLabel="Favorito"
-          >
-            <MaterialIcons
-              name={esFavorito ? "favorite" : "favorite-border"}
-              size={22}
-              color={esFavorito ? "#E53935" : "#222"}
-            />
-          </TouchableOpacity>
-        ) : null}
+          ) : null}
+        </View>
       </View>
+
 
 
       <ScrollView>
@@ -335,9 +398,12 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
 
         <View style={styles.content}>
           <View style={styles.rowTop}>
-            <Text style={styles.categoria}>{evento.categoria}</Text>
-            <Text style={styles.precio}>{evento.precio}</Text>
+            <Text style={styles.categoria}>
+              {obtenerNombreCategoria(evento.categoria)}
+            </Text>
+            <Text style={styles.precio}>{evento.precio || "Gratis"}</Text>
           </View>
+
 
           <Text style={styles.titulo}>{evento.titulo}</Text>
 
@@ -418,14 +484,16 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
                 style={[
                   styles.botonSecundarioText,
                   recordatorioEnviado && { color: "#2E7D32" },
+                  { textAlign: "center", lineHeight: 16 },
                 ]}
               >
                 {procesando
                   ? "Enviando..."
                   : recordatorioEnviado
-                    ? "Recordatorio enviado"
+                    ? "Recordatorio\nenviado"
                     : "Recordarme"}
               </Text>
+
             </TouchableOpacity>
           ) : null}
 
@@ -517,13 +585,16 @@ const styles = StyleSheet.create({
   botonSecundario: {
     flex: 1,
     flexDirection: "row",
-    gap: 8,
-    paddingVertical: 13,
+    gap: 6,
+    minHeight: 48,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
     borderWidth: 1.5,
     borderColor: "#5B4BDB",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF",
   },
   botonSecundarioText: { color: "#5B4BDB", fontWeight: "600", fontSize: 14 },
   botonSecundarioActivo: {

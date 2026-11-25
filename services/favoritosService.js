@@ -10,7 +10,7 @@ export const guardarFavorito = async (uid, eventoId, favorito) => {
   if (!uid || !eventoId) throw new Error("Falta identificar al usuario o el evento.");
   const referencia = doc(favoritosDe(uid), String(eventoId));
   if (favorito) {
-    await setDoc(referencia, { eventoId: String(eventoId) });
+    await setDoc(referencia, { eventoId: String(eventoId), guardadoEn: new Date().toISOString() });
   } else {
     await deleteDoc(referencia);
   }

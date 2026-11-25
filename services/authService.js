@@ -4,8 +4,9 @@ import {
   signOut,
   sendPasswordResetEmail,
   onAuthStateChanged,
+  deleteUser,
 } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { auth, db } from "./firebaseConfig";
 
 const oyentes = new Set();
@@ -150,3 +151,30 @@ export const actualizarPerfil = async (cambios) => {
 // Guarda los intereses elegidos (o una lista vacía si el usuario omite)
 export const guardarIntereses = (intereses) =>
   actualizarPerfil({ intereses, interesesListo: true });
+
+// Elimina el perfil en Firestore y la cuenta en Firebase Auth (requisito Google Play)
+export const eliminarCuentaUsuario = async () => {
+  try {
+    const user = auth.currentUser;
+    if (!user) return { ok: false, mensaje: "No hay una sesión activa." };
+
+    // 1. Borra el documento principal del usuario en Firestore
+    await deleteDoc(doc(db, "usuarios", user.uid));
+
+    // 2. Elimina el usuario de Firebase Authentication
+    await deleteUser(user);
+
+    sesionActual = null;
+    avisar();
+    return { ok: true };
+  } catch (e) {
+    if (e.code === "auth/requires-recent-login") {
+      return {
+        ok: false,
+        mensaje:
+          "Por seguridad, cierra sesión, vuelve a iniciar sesión e inténtalo de nuevo para eliminar tu cuenta.",
+      };
+    }
+    return { ok: false, mensaje: "No se pudo eliminar la cuenta. Intenta de nuevo." };
+  }
+};

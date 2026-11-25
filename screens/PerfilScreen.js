@@ -14,6 +14,7 @@ import * as ImagePicker from "expo-image-picker";
 import { MaterialIcons } from "@expo/vector-icons";
 import { actualizarPerfil, cerrarSesion } from "../services/authService";
 import { INTERESES } from "../data/categorias";
+import { eliminarCuentaUsuario } from "../services/authService";
 
 export default function PerfilScreen({ sesion }) {
   const esAdmin = sesion?.rol === "administrador";
@@ -175,6 +176,29 @@ export default function PerfilScreen({ sesion }) {
     ]);
   };
 
+
+  const confirmarEliminarCuenta = () => {
+    Alert.alert(
+      "Eliminar cuenta",
+      "Esta acción borrará tu perfil, tus favoritos y tus datos de forma permanente. ¿Estás seguro?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar definitivamente",
+          style: "destructive",
+          onPress: async () => {
+            setGuardando(true);
+            const resultado = await eliminarCuentaUsuario();
+            setGuardando(false);
+            if (!resultado.ok) {
+              Alert.alert("No se pudo eliminar", resultado.mensaje);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -220,6 +244,7 @@ export default function PerfilScreen({ sesion }) {
       <ScrollView
         contentContainerStyle={styles.contenido}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets={true}
       >
         <Text style={styles.label}>Nombre</Text>
         <TextInput
@@ -264,6 +289,7 @@ export default function PerfilScreen({ sesion }) {
                 <Text
                   style={[styles.chipText, activo && styles.chipTextActivo]}
                 >
+                  {item.emoji ? `${item.emoji} ` : ""}
                   {item.label}
                 </Text>
               </TouchableOpacity>
@@ -296,6 +322,15 @@ export default function PerfilScreen({ sesion }) {
         >
           <MaterialIcons name="logout" size={20} color="#E53935" />
           <Text style={styles.cerrarSesion}>Cerrar sesión</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.botonEliminarCuenta}
+          onPress={confirmarEliminarCuenta}
+          disabled={guardando}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.eliminarCuentaTexto}>Eliminar mi cuenta</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -424,5 +459,17 @@ const styles = StyleSheet.create({
     color: "#E53935",
     fontSize: 15,
     fontWeight: "700",
+  },
+  botonEliminarCuenta: {
+    marginTop: 18,
+    marginBottom: 10,
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  eliminarCuentaTexto: {
+    color: "#888",
+    fontSize: 13,
+    fontWeight: "600",
+    textDecorationLine: "underline",
   },
 });
