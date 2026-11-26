@@ -20,19 +20,17 @@ export default function PestanasPrincipales({ sesion }) {
     <Pestanas.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#5B4BDB",
-        tabBarInactiveTintColor: "#777",
         tabBarShowLabel: false,
+        tabBarActiveTintColor: "#5B4BDB",
+        tabBarInactiveTintColor: "#888",
         tabBarStyle: {
-          backgroundColor: "#FFFFFF",
-          height: 65,
-          borderTopWidth: 1,
-          borderTopColor: "#EAEAEA",
+          height: 60,
+          paddingTop: 0,
+          paddingBottom: 0,
         },
         tabBarItemStyle: {
           justifyContent: "center",
           alignItems: "center",
-          height: "100%",
         },
       }}
     >

@@ -94,6 +94,7 @@ export default function PublicarScreen({ sesion, navigation }) {
   const [error, setError] = useState("");
   const [mostrarCalendario, setMostrarCalendario] = useState(false);
   const [mostrarReloj, setMostrarReloj] = useState(false);
+  const [mostrarEnlace, setMostrarEnlace] = useState(false);  
   const [fechaCalendario, setFechaCalendario] = useState(new Date());
   const [horaCalendario, setHoraCalendario] = useState(new Date());
   const [enviando, setEnviando] = useState(false);
@@ -187,6 +188,7 @@ export default function PublicarScreen({ sesion, navigation }) {
     setImagenArchivo("");
     setImagenEnlace("");
     setErrorVistaPrevia(false);
+    setMostrarEnlace(false);
   };
 
   const enviar = async () => {
@@ -480,33 +482,51 @@ export default function PublicarScreen({ sesion, navigation }) {
               </View>
             )}
           </View>
-        ) : (
-          <>
-            <TouchableOpacity
-              style={estilos.botonImagen}
-              onPress={seleccionarImagen}
-              activeOpacity={0.8}
-              disabled={enviando}
-            >
-              <MaterialIcons name="add-photo-alternate" size={22} color="#5B4BDB" />
-              <Text style={estilos.botonImagenTexto}>
-                Seleccionar imagen del evento
-              </Text>
-            </TouchableOpacity>
+     ) : (
+       <>
+         <TouchableOpacity
+           style={estilos.botonImagen}
+           onPress={seleccionarImagen}
+           activeOpacity={0.8}
+           disabled={enviando}
+         >
+           <MaterialIcons name="add-photo-alternate" size={22} color="#5B4BDB" />
+           <Text style={estilos.botonImagenTexto}>
+             Seleccionar imagen del evento
+           </Text>
+         </TouchableOpacity>
 
-            <Text style={estilos.separador}>o usa un enlace (opcional)</Text>
-            <CampoTexto
-              etiqueta="Imagen (enlace)"
-              valor={imagenEnlace}
-              onChangeText={cambiarEnlaceImagen}
-              placeholder="Escribir dirección de la imagen"
-              autoCapitalize="none"
-              keyboardType="url"
-              editable={!enviando}
-              esUrl={true}
-            />
-          </>
-        )}
+         <TouchableOpacity
+           onPress={() => setMostrarEnlace((prev) => !prev)}
+           activeOpacity={0.7}
+           disabled={enviando}
+         >
+           <Text
+             style={[
+               estilos.separador,
+               { color: "#5B4BDB", fontWeight: "600" },
+             ]}
+           >
+             {mostrarEnlace
+               ? "Ocultar enlace"
+               : "o usa un enlace (opcional)"}
+           </Text>
+         </TouchableOpacity>
+
+         {mostrarEnlace ? (
+           <CampoTexto
+             etiqueta="Imagen (enlace)"
+             valor={imagenEnlace}
+             onChangeText={cambiarEnlaceImagen}
+             placeholder="Escribir dirección de la imagen"
+             autoCapitalize="none"
+             keyboardType="url"
+             editable={!enviando}
+             esUrl={true}
+           />
+         ) : null}
+       </>
+     )}
 
         <View
           onTouchStart={() => {

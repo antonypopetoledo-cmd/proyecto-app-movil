@@ -64,6 +64,9 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
   const [hora, setHora] = useState(inicio);
   const [mostrarFecha, setMostrarFecha] = useState(false);
   const [mostrarHora, setMostrarHora] = useState(false);
+  const [mostrarEnlace, setMostrarEnlace] = useState(
+    Boolean(!esBase64(imagenInicial) && imagenInicial)
+  );
   const [guardando, setGuardando] = useState(false);
   const [campoActivo, setCampoActivo] = useState(null);
 
@@ -158,6 +161,7 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
     setImagenArchivo("");
     setImagenEnlace("");
     setErrorVistaPrevia(false);
+    setMostrarEnlace(false);
   };
 
   const guardar = async () => {
@@ -388,109 +392,6 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
 
         {/* Sección de imagen con cámara/galería, botón quitar y encuadre */}
         <Text style={estilos.etiqueta}>Imagen del evento</Text>
-        <TouchableOpacity
-          style={estilos.botonImagen}
-          onPress={seleccionarImagen}
-          disabled={guardando}
-          activeOpacity={0.8}
-        >
-          <MaterialIcons name="add-photo-alternate" size={20} color="#5B4BDB" />
-          <Text style={estilos.botonImagenTexto}>
-            {imagenVista
-              ? "Cambiar imagen (Cámara / Galería)"
-              : "Subir imagen (Cámara / Galería)"}
-          </Text>
-        </TouchableOpacity>
-
-        {imagenVista ? (
-          <View style={estilos.previewContenedor}>
-            {errorVistaPrevia ? (
-              <View style={[estilos.vistaPreviaImagen, estilos.previewError]}>
-                <MaterialIcons name="broken-image" size={32} color="#999" />
-                <Text style={estilos.previewErrorTexto}>
-                  No se pudo cargar la imagen
-                </Text>
-              </View>
-            ) : (
-              <Image
-                source={{ uri: imagenVista }}
-                style={estilos.vistaPreviaImagen}
-                contentFit="cover"
-                contentPosition={form.posicion || "center"}
-                onError={() => setErrorVistaPrevia(true)}
-              />
-            )}
-
-            <TouchableOpacity
-              style={estilos.botonQuitar}
-              onPress={quitarImagen}
-              activeOpacity={0.8}
-              disabled={guardando}
-            >
-              <MaterialIcons name="close" size={18} color="#FFF" />
-            </TouchableOpacity>
-
-            {!errorVistaPrevia && (
-              <View style={estilos.encuadreBox}>
-                <Text style={estilos.encuadreTitulo}>
-                  Encuadre en tarjeta del catálogo:
-                </Text>
-                <View style={estilos.encuadreFila}>
-                  {[
-                    { id: "top", label: "Arriba" },
-                    { id: "center", label: "Centro" },
-                    { id: "bottom", label: "Abajo" },
-                  ].map((op) => {
-                    const activo = (form.posicion || "center") === op.id;
-                    return (
-                      <TouchableOpacity
-                        key={op.id}
-                        style={[
-                          estilos.encuadreBtn,
-                          activo && estilos.encuadreBtnActivo,
-                        ]}
-                        onPress={() => cambiar("posicion", op.id)}
-                        disabled={guardando}
-                      >
-                        <Text
-                          style={[
-                            estilos.encuadreBtnTexto,
-                            activo && estilos.encuadreBtnTextoActivo,
-                          ]}
-                        >
-                          {op.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
-          </View>
-        ) : null}
-
-        <Text style={estilos.separador}>
-          {imagenArchivo
-            ? "Quita la imagen para usar un enlace"
-            : "o usa un enlace (opcional)"}
-        </Text>
-        <TextInput
-          style={[estilos.input, Boolean(imagenArchivo) && estilos.inputBloqueado]}
-          value={imagenEnlace}
-          onChangeText={cambiarEnlaceImagen}
-          placeholder="https://ejemplo.com"
-          placeholderTextColor="#999"
-          autoCapitalize="none"
-          keyboardType="url"
-          editable={!guardando && !imagenArchivo}
-          onFocus={() => setCampoActivo("imagenEnlace")}
-          onBlur={() => setCampoActivo(null)}
-          selection={
-            campoActivo !== "imagenEnlace" ? { start: 0, end: 0 } : undefined
-          }
-        />
-
-        <Text style={estilos.etiqueta}>Imagen del evento</Text>
 
         {imagenVista ? (
           <View style={estilos.previewContenedor}>
@@ -571,24 +472,43 @@ export default function EditarEventoScreen({ route, navigation, sesion }) {
               </Text>
             </TouchableOpacity>
 
-            <Text style={estilos.separador}>o usa un enlace (opcional)</Text>
-            <TextInput
-              style={estilos.input}
-              value={imagenEnlace}
-              onChangeText={cambiarEnlaceImagen}
-              placeholder="https://ejemplo.com"
-              placeholderTextColor="#999"
-              autoCapitalize="none"
-              keyboardType="url"
-              editable={!guardando}
-              onFocus={() => setCampoActivo("imagenEnlace")}
-              onBlur={() => setCampoActivo(null)}
-              selection={
-                campoActivo !== "imagenEnlace" ? { start: 0, end: 0 } : undefined
-              }
-            />
+            <TouchableOpacity
+              onPress={() => setMostrarEnlace((prev) => !prev)}
+              activeOpacity={0.7}
+              disabled={guardando}
+            >
+              <Text
+                style={[
+                  estilos.separador,
+                  { color: "#5B4BDB", fontWeight: "600" },
+                ]}
+              >
+                {mostrarEnlace
+                  ? "Ocultar enlace"
+                  : "o usa un enlace (opcional)"}
+              </Text>
+            </TouchableOpacity>
+
+            {mostrarEnlace ? (
+              <TextInput
+                style={estilos.input}
+                value={imagenEnlace}
+                onChangeText={cambiarEnlaceImagen}
+                placeholder="https://ejemplo.com"
+                placeholderTextColor="#999"
+                autoCapitalize="none"
+                keyboardType="url"
+                editable={!guardando}
+                onFocus={() => setCampoActivo("imagenEnlace")}
+                onBlur={() => setCampoActivo(null)}
+                selection={
+                  campoActivo !== "imagenEnlace" ? { start: 0, end: 0 } : undefined
+                }
+              />
+            ) : null}
           </>
         )}
+
         <Text style={estilos.etiqueta}>Descripción</Text>
         <TextInput
           style={[estilos.input, estilos.inputMultilinea]}

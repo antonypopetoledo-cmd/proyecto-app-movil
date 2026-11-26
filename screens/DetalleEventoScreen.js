@@ -484,16 +484,14 @@ export default function DetalleEventoScreen({ route, navigation, sesion }) {
                 style={[
                   styles.botonSecundarioText,
                   recordatorioEnviado && { color: "#2E7D32" },
-                  { textAlign: "center", lineHeight: 16 },
                 ]}
               >
                 {procesando
                   ? "Enviando..."
                   : recordatorioEnviado
-                    ? "Recordatorio\nenviado"
+                    ? "Recordatorio enviado"
                     : "Recordarme"}
               </Text>
-
             </TouchableOpacity>
           ) : null}
 
@@ -585,16 +583,13 @@ const styles = StyleSheet.create({
   botonSecundario: {
     flex: 1,
     flexDirection: "row",
-    gap: 6,
-    minHeight: 48,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    gap: 8,
+    paddingVertical: 13,
     borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: "#5B4BDB",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFF",
+    borderWidth: 1.5,
+    borderColor: "#5B4BDB",
   },
   botonSecundarioText: { color: "#5B4BDB", fontWeight: "600", fontSize: 14 },
   botonSecundarioActivo: {
